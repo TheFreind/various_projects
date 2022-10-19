@@ -1,0 +1,18 @@
+|| COST: $92.25  QTY: 7  METHOD: Cash 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
+|| COST: $52.35  QTY: 4  METHOD: Gift 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
+|| COST: $23.52  QTY: 3  METHOD: Check 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
+|| COST: $37.61  QTY: 5  METHOD: Credit 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
+|| COST: $59.94  QTY: 5  METHOD: Cash 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
+|| COST: $58.3  QTY: 5  METHOD: Debit 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
+|| COST: $45.61  QTY: 7  METHOD: Credit 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
+|| COST: $89.19  QTY: 5  METHOD: Cash 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
+|| COST: $46.85  QTY: 9  METHOD: Credit 
+|| Thank you for shopping at Lowe's! Ask our manager, Jennifer Philips, for improvements! 
