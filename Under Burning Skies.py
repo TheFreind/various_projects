@@ -117,7 +117,7 @@ verbsCo = ["decimated", "eradicated", "annihilated", "beat the shit out of", "cl
            "discombobulated", "beat", "destroyed", "defeated", "outsmarted", "bodied",
            "blasted", "thrashed", "vibe checked", "K.O.'d" ]
 verbsDi = ["distracted", "charmed", "harrassed", "impeded", "mocked", "taunted",
-           "sabotaged", "insulted their mother", "failed the PS150 exam of"] 
+           "sabotaged", "insulted the mother of", "failed the PS150 exam of"] 
 raidedObjects = ["a Village", "the Outer Wall farms", "a child's lollipop", "several families",
                  "Uncle Iroh's tea", "some bridges", "parts of the Royal Palace", "Zuko's honor",
                  "the Cabbage Dealer", "a cup of lean"]
@@ -696,8 +696,9 @@ def mothershipPhase():
                 availableSpawnPoint[ (enemy[0][0])-1 ] = False
 
     
-    columnsWithEnemies = []
+    
     for enemy in enemiesRespawning:
+        columnsWithEnemies = []
 
         # Check which columns have enemies in them
         for enemyInAction in FIRENATION:
