@@ -7,16 +7,15 @@
 #   - Enemy weapons target random rooms (or give them targetting AI)
 # WHAT IF I ADD MY OWN IDEAS OF FTL HERE??!?!?
 
-
-from random import randint
 import time
-from FTLmockData import weaponsDatabase, roomsDatabase
-
+from random import randint, choice
+from FTLmockData import * # Dictionaries info
 
 
 class Ship(object):
+    destroyed = False
     shields = 0
-    evasion = 0
+    evasion = 15
     oxygen = 100
 
     # Might need to add "rooms" parameter
@@ -32,18 +31,90 @@ class Ship(object):
         else:
             self.hull = randint(5, 15) # Should be bigger for bigger ships
 
+        if self.name in playableShipsCollection: # Player ships get fixed starting weapons.
+            for desire in startingWeapons[self.name]:
+                for gun in weaponsCollection:
+                    if desire == gun.name:
+                        self.weapons.append(gun)
+                        continue
+        # else    figure out random enemy loadouts
+
+
     def __repr__(self):
         return self.name
 
+
+    def checkWeaponStatus(self):
+        for index, gun in enumerate(self.weapons):
+            if gun.charge == gun.cooldown and gun.autoFire == True:
+                self.fireWeapon(gun)
+            elif gun.charge == gun.cooldown and gun.autoFire == False:
+                #print("#%d [%s] %s - READY" % (index+1, "I"*gun.powerNeeded, gun) )
+                pass
+            elif gun.charge < gun.cooldown:
+                #print("#%d [%s] %s - %ds remaining..." % (index+1, "I"*gun.powerNeeded, gun, (gun.cooldown-gun.charge)) )
+                pass
+
+    # Needs more work
+    def fireWeapon(self, gun):
+        target = otherShip(self)
+        #print(f'{gun} is firing at {target}!')
+        # Choose room, hit shields, miss shots, damage system, damage crew, etc...
+        # Enter targetting room. This here is just random room selection.
+        
+
+        for shot in range(gun.projectiles):
+            room_targetted = choice(target.rooms) # Suggestion: Make AI more likely to target high-value systems.
+            roll_to_hit = randint(1, 100)
+            if target.evasion > roll_to_hit and gun.type != "Beam":     # Beams cannot miss
+                print("MISS!")
+            else:
+
+                if gun.type == "Beam":
+                    target.hull -= gun.damage * gun.beam_length
+                else:
+                    target.hull -= gun.damage
+                # System in room takes 2 damage
+                # Crew damage applied to all crew in room
+                roll_to_add_fire = randint(1, 100)
+                roll_to_add_breach = randint(1, 100)
+                #roll_to_stun = randint(1, 100)
+                if roll_to_add_fire <= gun.fire_chance and len(room_targetted.fires) < room_targetted.size: # Max fires = size of room
+                    room_targetted.fires.append(40) # Add a 40 health fire to the fire list
+                    print("Fire started!")
+                if roll_to_add_breach <= gun.breach_chance and len(room_targetted.breaches) < room_targetted.size:
+                    room_targetted.breaches.append(40)
+                    print("Hull breached!")
+                #if roll_to_stun <= gun.stun_chance:
+                #    pass           
+
+                if target.hull <= 0:
+                    target.destroyed = True
+                else:
+                    print(f"{target}'s hull has been reduced down to {target.hull}.")
+
+
+        gun.charge = 0
+        if gun.type == "Missile" or gun.type == "Bomb":
+            global MISSILES
+            MISSILES -= 1
+
+
+
+
+
+
 # Types - Laser, Flak, Missile, Bomb, Beam, Ion
 class Weapon(object):
-    recharge = 0
+    charge = 0
     
     ion_damage = 0
     fire_chance = 0    # Chances are in %
     breach_chance = 0
     stun_chance = 0
     beam_length = 0
+
+    autoFire = True    # When enemy AI cloaks, it deactivates autoFire and reenables when exiting cloak
 
     # Name of weapon, type determines rules it follows, # of damage it does, # of seconds before firing, # of projectiles, cost at shop.
     def __init__(self, name, type, damage, cooldown, projectiles, powerNeeded, shopCost):
@@ -54,6 +125,7 @@ class Weapon(object):
         self.projectiles = projectiles
         self.powerNeeded = powerNeeded
         self.shopCost = shopCost
+        # set to Auto or Manual firing?
 
         if type == "Laser" or type == "Beam" or type == "Missile" or type == "Flak":     # Normal damage + system damage
             self.system_damage = self.damage
@@ -90,14 +162,15 @@ class Weapon(object):
 # Each room should have spaces for people, # of vents, breaches, fire, o2 in the room, and a system.
 # A ship has a list of room OBJECTS, whose data is pulled from a dictionary  
 class Room(object):
-    fires = 0       
-    breaches = 0
     oxygen = 100
 
     def __init__(self, size, system, vents):
         self.size = size
         self.system = system
         self.vents = vents
+
+        self.fires = [] # List containing health of each fire. # of fires is len of the list.   
+        self.breaches = [] # Ditto
 
     def __repr__(self):
         if self.size == 2:
@@ -149,15 +222,6 @@ class Crew(object):
         }
         self.location = randint(5) # Random spawn location       
 
-# Database of Weapon objects in FTL (converted to Tuple later). Info imported from ..Data.py weaponsDatabase  
-weaponsCollection = []
-
-systemsCollection = ("Piloting", "Engines", "Weapons", "Shields", "Oxygen", "Medbay", "Clone Bay", "Drone Control",
-                "Backup Battery", "Doors", "Sensors", "Hacking", "Mind Control", "Cloaking", "Teleporter")
-encounterShipsCollection = ("Slug Interceptor", "Auto Scout", "Auto Assault", "Rebel Fighter")
-playableShipsCollection = ("Kestral", "Nissan", "Osprey", "Red-Tail") # Fill this up later
-
-SCRAP = 20
 
 # Turn all weapons imported from a dictionary into proper Weapon classes
 for gun in weaponsDatabase:
@@ -175,21 +239,64 @@ def generateRooms(whichShip):
         if X[1] != "Empty":                  # Whilst we're at it, add systems in rooms to the systems list
             whichShip.systems.append(X[1])       # REMOVE THIS? Systems should be a class in of its own
 
+def otherShip(whoAreWe):
+    if whoAreWe == playerShip:
+        return enemyShip
+    elif whoAreWe == enemyShip:
+        return playerShip
+
+def grantStartingWeapons(shipClass):
+    if shipClass.name in playableShipsCollection:
+        for desire in startingWeapons[shipClass.name]:
+            for gun in weaponsCollection:
+                if desire == gun.name:
+                    shipClass.weapons.append(gun)
+                    continue
+    #else enemy encounter weaponry
+
+
+
+SCRAP = 20
+FUEL = 13
+MISSILES = 12
+DRONEPARTS = 0
+
 
 print("-----------------------------------------\n\n\n")
 
 
 playerShip = Ship("Kestral")
-
 enemyShip = Ship("Rebel Fighter")
 
+generateRooms(playerShip)
+generateRooms(enemyShip)
+
+#print(playerShip.checkWeaponStatus())
 
 
 
-#SECONDS = 0
-#for x in range(1, 31):
-#    SECONDS += 1
-#    time.sleep(0.1)
+SECONDS = 0
+for x in range(1, 60):
+    SECONDS += 1
+    for gun in playerShip.weapons: # All weapons not ready will charge up 1 second
+        if gun.charge < gun.cooldown:
+            gun.charge += 1
 
+    playerShip.checkWeaponStatus()
+    if otherShip(playerShip).destroyed == True: # You won the fight
+        print("%s has been destroyed! Well done. Precluding combat." % otherShip(playerShip) )
+        # Earn rewards
+        break
+    elif otherShip(enemyShip).destroyed == True: # You lose
+        print("The %s has been annihilated... We have failed our mission. Game over." % otherShip(enemyShip) )
+        # Game over will occur
+        break
+
+
+    time.sleep(0.1)
+
+print(enemyShip.rooms)
+for index, room in enumerate(enemyShip.rooms):
+    print(f"Room #{index} - {room.fires}")
 
 print("\n\n\n-----------------------------------------")
