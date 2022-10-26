@@ -1,25 +1,35 @@
 # List containing weapons in FTL. Format is built around the Weapon class parameters.
 ## "Name" : ["Type", damage, cooldown, projectiles, powerNeeded, cost] 
 ## Missing values will be represented by None
-weaponsDatabase = { "Basic Laser": ["Laser",1,10,1,1,20],  "Ion Blast": ["Ion",1,8,1,1,10], 
+weaponsDatabase = { "Basic Laser": ["Laser",1,10,1,1,20],  "Burst Laser Mk II": ["Laser",1,12,3,2,60], 
                     "Small Bomb": ["Bomb",2,14,1,1,20],      "Mini Beam": ["Beam",1,10,1,1,20], 
                     "Flak I": ["Flak",1,8,3,2,40],           "Artemis": ["Missile",2,11,1,1,40],
-                    "Burst Laser Mk II": ["Laser",1,12,3,2,60]
+                    "Ion Blast": ["Ion",1,8,1,1,10]
                 }
 
+# Maybe be startingGear, with weapons, drones, systems, crew, augmentations, maxWeapons and maxDrones...
 startingWeapons = {
     "Kestral": ["Burst Laser Mk II", "Artemis"],
 }
 
 # Maybe make it proper 2d and not 1d?
+## "Name of Ship" : [ [Size of room, System within room, # of vents], etc...  ]
 roomsDatabase = {
-    # Kestral Layout - [Small empty(vent)][Big Engines][small O2][big weapons][big shields][small doors(vent)][big medbay][small sensors][small cockpit]
     "Kestral": [ [2,"Empty",2],[4,"Engines",0],[2,"Oxygen",0],[4,"Weapons",0],[4,"Shields",0],
                  [2,"Doors",2],[4,"Medbay",0],[2,"Sensors",0],[2,"Piloting",0] ],
     "Rebel Fighter": [  [4,"Weapons",0],[4,"Engines",0],[4,"Shields",0],[2,"Medbay",0],
                         [2,"Empty",0],[2,"Oxygen",0],[2,"Piloting",0] ],
     "Auto Assault": [ [4,"Weapons",0],[4,"Engines",0],[4,"Shields",0] ]
     }
+
+## "Name of System" : maxLevel
+systemsDatabase = { 
+    "Shields": 8, "Engines": 8, "Weapons": 8, "Drone Control": 8,  
+    "Teleporter": 3, "Cloaking": 3, "Mind Control": 3, "Artillery Beam": 4,
+    "Flak Artillery": 4, "Hacking": 3, "Oxygen": 3, "Medbay": 3, "Clone Bay": 3,
+    "Piloting": 3, "Sensors": 3, "Doors": 3, "Backup Battery": 2
+}
+
 
 
 # Database of Weapon objects in FTL (converted to Tuple later). Info imported from ..Data.py weaponsDatabase  

@@ -22,8 +22,8 @@ class Ship(object):
     def __init__(self, name):
         self.name = name
 
-        self.weapons = []
-        self.systems = []
+        self.weapons = {}
+        self.systems = {}
         self.rooms = []
 
         if name in playableShipsCollection:
@@ -31,33 +31,25 @@ class Ship(object):
         else:
             self.hull = randint(5, 15) # Should be bigger for bigger ships
 
-        if self.name in playableShipsCollection: # Player ships get fixed starting weapons.
-            for desire in startingWeapons[self.name]:
-                for gun in weaponsCollection:
-                    if desire == gun.name:
-                        self.weapons.append(gun)
-                        continue
-        # else    figure out random enemy loadouts
 
+
+    def grantStartingWeapons(self, playableShipsCollection, startingWeapons, weaponsCollection):
+        if self.name in playableShipsCollection:           # Find weapons for a player's ship. 
+            for desire in startingWeapons[self.name]: 
+                for gun in weaponsCollection:   
+                    print(desire, gun.name)#                
+                    if desire == gun.name:                      
+                        self.weapons[gun.name] = gun
+                        break
+
+        #else enemy encounter weaponry
 
     def __repr__(self):
         return self.name
 
 
-    def checkWeaponStatus(self):
-        for index, gun in enumerate(self.weapons):
-            if gun.charge == gun.cooldown and gun.autoFire == True:
-                self.fireWeapon(gun)
-            elif gun.charge == gun.cooldown and gun.autoFire == False:
-                #print("#%d [%s] %s - READY" % (index+1, "I"*gun.powerNeeded, gun) )
-                pass
-            elif gun.charge < gun.cooldown:
-                #print("#%d [%s] %s - %ds remaining..." % (index+1, "I"*gun.powerNeeded, gun, (gun.cooldown-gun.charge)) )
-                pass
-
     # Needs more work
-    def fireWeapon(self, gun):
-        target = otherShip(self)
+    def fireWeapon(self, gun, target):
         #print(f'{gun} is firing at {target}!')
         # Choose room, hit shields, miss shots, damage system, damage crew, etc...
         # Enter targetting room. This here is just random room selection.
@@ -184,13 +176,35 @@ class Room(object):
 
 
 class System(object):
-    def __init__(self, name, startingLevel):
+    power = 1           # Amount of power in system
+    systemLevel = 2     # Current level of System. Can take up to this much power
+    damage = 0
+    ion_damage = 0
+        #allowablePower = systemLevel
+    allowablePower = systemLevel - damage - ion_damage
+
+    def __init__(self, name, maxUpgradeableLevel):
         self.name = name
-        self.level = startingLevel
+        self.maxUpgradeableLevel = maxUpgradeableLevel
 
 
     def __repr__(self):
         return self.name
+
+    #def determinePower(self):
+    #    allowablePower = self.systemLevel - self.damage - self.ion_damage
+
+    #def powerUp(self, amount):     # Cannot exceed allowablePower
+    #def powerDown(self, amount):   # Cannot exceed allowablePower
+
+    def rejuvenateShield(self, ship):
+        for item in ship.systems:
+            if item.name == "Shields":
+                
+                
+                break
+
+
 
 
 # Types: Ship drone, Boarding drone, attack drone, defense drone
@@ -237,22 +251,39 @@ def generateRooms(whichShip):
         newRoom = Room(X[0], X[1], X[2])     # The room's Size, System, and Vents 
         whichShip.rooms.append(newRoom)
         if X[1] != "Empty":                  # Whilst we're at it, add systems in rooms to the systems list
-            whichShip.systems.append(X[1])       # REMOVE THIS? Systems should be a class in of its own
+            sysName = X[1]
+            maxUpgradeableLevel = systemsDatabase[sysName]
+        # Simultaneously define the System class w/ newly made parameters and add it to ship system dictionary
+            whichShip.systems[sysName] = System(sysName, maxUpgradeableLevel) # Add to ship system dict ---> "Name": System Object
 
+
+def grantStartingWeapons(shipClass):
+    if shipClass.name in playableShipsCollection:           # Find weapons for a player's ship. 
+        for desire in startingWeapons[shipClass.name]: 
+            for gun in weaponsCollection:                   
+                if desire == gun.name:                      
+                    shipClass.weapons[gun.name] = gun       # Add to ship weapon dictionary ---> "Name": Weapon Object 
+                    continue
+    #else enemy encounter weaponry
+
+# What if this is a seperate method of Ship and not a function?
 def otherShip(whoAreWe):
     if whoAreWe == playerShip:
         return enemyShip
     elif whoAreWe == enemyShip:
         return playerShip
 
-def grantStartingWeapons(shipClass):
-    if shipClass.name in playableShipsCollection:
-        for desire in startingWeapons[shipClass.name]:
-            for gun in weaponsCollection:
-                if desire == gun.name:
-                    shipClass.weapons.append(gun)
-                    continue
-    #else enemy encounter weaponry
+
+def checkWeaponStatus(shipClass):
+    for index, gun in enumerate(shipClass.weapons):
+        if gun.charge == gun.cooldown and gun.autoFire == True:
+            shipClass.fireWeapon(gun, otherShip(shipClass) )
+        elif gun.charge == gun.cooldown and gun.autoFire == False:
+            #print("#%d [%s] %s - READY" % (index+1, "I"*gun.powerNeeded, gun) )
+            pass
+        elif gun.charge < gun.cooldown:
+            #print("#%d [%s] %s - %ds remaining..." % (index+1, "I"*gun.powerNeeded, gun, (gun.cooldown-gun.charge)) )
+            pass
 
 
 
@@ -268,6 +299,9 @@ print("-----------------------------------------\n\n\n")
 playerShip = Ship("Kestral")
 enemyShip = Ship("Rebel Fighter")
 
+playerShip.grantStartingWeapons(playableShipsCollection, startingWeapons, weaponsCollection)
+# Insert Enemy grantStartingWeapons    once I finish adding enemy weapon logic
+
 generateRooms(playerShip)
 generateRooms(enemyShip)
 
@@ -275,28 +309,34 @@ generateRooms(enemyShip)
 
 
 
-SECONDS = 0
-for x in range(1, 60):
-    SECONDS += 1
-    for gun in playerShip.weapons: # All weapons not ready will charge up 1 second
-        if gun.charge < gun.cooldown:
-            gun.charge += 1
+# SECONDS = 0
+# for x in range(1, 60):
+#     SECONDS += 1
+#     for gun in playerShip.weapons: # All weapons not ready will charge up 1 second
+#         if gun.charge < gun.cooldown:
+#             gun.charge += 1
 
-    playerShip.checkWeaponStatus()
-    if otherShip(playerShip).destroyed == True: # You won the fight
-        print("%s has been destroyed! Well done. Precluding combat." % otherShip(playerShip) )
-        # Earn rewards
-        break
-    elif otherShip(enemyShip).destroyed == True: # You lose
-        print("The %s has been annihilated... We have failed our mission. Game over." % otherShip(enemyShip) )
-        # Game over will occur
-        break
+#     #checkWeaponStatus(playerShip)
+#     if otherShip(playerShip).destroyed == True: # You won the fight
+#         print("%s has been destroyed! Well done. Precluding combat." % otherShip(playerShip) )
+#         # Earn rewards
+#         break
+#     elif otherShip(enemyShip).destroyed == True: # You lose
+#         print("The %s has been annihilated... We have failed our mission. Game over." % otherShip(enemyShip) )
+#         # Game over will occur
+#         break
 
 
-    time.sleep(0.1)
+#     time.sleep(0.1)
 
-print(enemyShip.rooms)
-for index, room in enumerate(enemyShip.rooms):
-    print(f"Room #{index} - {room.fires}")
+
+
+print(playerShip.weapons.keys())
+print("This %s can deal %d damage" % (playerShip.weapons["Artemis"].name, playerShip.weapons["Artemis"].damage) )
+
+for name in playerShip.systems:
+    print("Max upgrades for %s: %d" % (name, playerShip.systems[name].maxUpgradeableLevel) )
+
+        
 
 print("\n\n\n-----------------------------------------")
