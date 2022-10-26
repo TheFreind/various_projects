@@ -31,21 +31,18 @@ class Ship(object):
         else:
             self.hull = randint(5, 15) # Should be bigger for bigger ships
 
-
+    def __repr__(self):
+        return self.name
 
     def grantStartingWeapons(self, playableShipsCollection, startingWeapons, weaponsCollection):
-        if self.name in playableShipsCollection:           # Find weapons for a player's ship. 
+        if self.name in playableShipsCollection:           # Find weapons for a player's ship and add them to the dict .weapons 
             for desire in startingWeapons[self.name]: 
-                for gun in weaponsCollection:   
-                    print(desire, gun.name)#                
+                for gun in weaponsCollection:                
                     if desire == gun.name:                      
                         self.weapons[gun.name] = gun
                         break
 
         #else enemy encounter weaponry
-
-    def __repr__(self):
-        return self.name
 
 
     # Needs more work
@@ -178,10 +175,9 @@ class Room(object):
 class System(object):
     power = 1           # Amount of power in system
     systemLevel = 2     # Current level of System. Can take up to this much power
+    allowablePower = systemLevel
     damage = 0
     ion_damage = 0
-        #allowablePower = systemLevel
-    allowablePower = systemLevel - damage - ion_damage
 
     def __init__(self, name, maxUpgradeableLevel):
         self.name = name
@@ -194,8 +190,12 @@ class System(object):
     #def determinePower(self):
     #    allowablePower = self.systemLevel - self.damage - self.ion_damage
 
-    #def powerUp(self, amount):     # Cannot exceed allowablePower
-    #def powerDown(self, amount):   # Cannot exceed allowablePower
+    def powerUp(self, amount):     # Cannot exceed allowablePower
+        self.power += amount
+
+    def powerDown(self, amount):   # Cannot exceed allowablePower
+        self.power -= amount
+
 
     def rejuvenateShield(self, ship):
         for item in ship.systems:
@@ -203,8 +203,6 @@ class System(object):
                 
                 
                 break
-
-
 
 
 # Types: Ship drone, Boarding drone, attack drone, defense drone
