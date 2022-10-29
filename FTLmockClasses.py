@@ -55,14 +55,17 @@ class Ship(object):
 
         #else enemy encounter weaponry
 
-
+    # So long as the ship has shields, that it has at least 2 power, and that it currently has less
+    #   shield bubbles than its maximum, start rejuvenating them. 
     def rejuvenateShield(self, shieldClass): # Check if Ship has shields within the main code...
-        if self.shield_recharge_progress < 3 and self.shields < floor(shieldClass.power / 2):
-            self.shield_recharge_progress += 1
+        if shieldClass.power >= 2:
+            
+            if self.shield_recharge_progress < 3 and self.shields < floor(shieldClass.power / 2): 
+                self.shield_recharge_progress += 1
 
-        elif self.shields < floor(shieldClass.power / 2):
-            self.shields += 1
-            self.shield_recharge_progress = 0
+            elif self.shields < floor(shieldClass.power / 2): 
+                self.shields += 1
+                self.shield_recharge_progress = 0
 
 
     # Needs more work
@@ -71,9 +74,9 @@ class Ship(object):
         # Choose room, hit shields, miss shots, damage system, damage crew, etc...
         # Enter targetting room. This here is just random room selection.
         
-
+    # Suggestion: Make AI more likely to target high-value systems.
         for shot in range(gun.projectiles):
-            room_targetted = choice(target.rooms) # Suggestion: Make AI more likely to target high-value systems.
+            room_targetted = choice(target.rooms) 
             roll_to_hit = randint(1, 100)
             if target.evasion > roll_to_hit and gun.type != "Beam":     # Beams cannot miss
                 print("-- MISS!")
@@ -104,6 +107,9 @@ class Ship(object):
                         damageDone = gun.damage
 
                 if shieldsPenetrated == True:
+                    if room_targetted.system != "Empty": # System damage done, shift power level
+                        room_targetted.system.damage += damageDone         
+                        room_targetted.system.determineDamage(target, room_targetted.system)
                     # Crew damage applied to all crew in room
                     roll_to_add_fire = randint(1, 100)
                     roll_to_add_breach = randint(1, 100)
@@ -120,7 +126,7 @@ class Ship(object):
 
                 if damageDone > 0:
                     target.hull -= damageDone
-                    print(f"-- {target}'s hull has been reduced down to {target.hull}.")
+                    print(f"-- Target room: {room_targetted.system} | {target}'s Hull: {target.hull}")
 
                 if target.hull <= 0:
                     target.destroyed = True
@@ -217,7 +223,6 @@ class Room(object):
 class System(object):
     power = 2           # Amount of power in system
     systemLevel = 2     # Current Upgraded level of System. Can take up to this much power
-    allowablePower = systemLevel
     damage = 0
     ion_damage = 0
 
@@ -229,11 +234,23 @@ class System(object):
     def __repr__(self):
         return self.name
 
-    #def determinePower(self):
-    #    allowablePower = self.systemLevel - self.damage - self.ion_damage
+    def determineDamage(self, shipClass, systemBlasted):
+        self.power = self.systemLevel - self.damage - self.ion_damage       # ! Wait... how does ion damage work with actual damage?
+        if self.power < 0:
+            self.power = 0
+
+        if systemBlasted.name == "Shields":
+            shipClass.shields = floor(systemBlasted.power / 2)
+
+        # Rightmost-powered weapon starts charging down at -2 charge/sec
+        #if systemBlasted.name == "Weapons": 
+        #    pass 
+
+        # etc for other systems
+
 
     def powerUp(self):
-        if self.power < self.allowablePower:
+        if self.power < self.systemLevel:
             self.power += 1
         else:
             print("\nNOTE: System is at maximum power. Cannot power any further!")

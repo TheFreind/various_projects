@@ -26,13 +26,18 @@ weaponsCollection = tuple(weaponsCollection) # Solidify list by turning into tup
 # Parameter must take the Ship object
 def generateRooms(whichShip):
     for X in roomsDatabase[whichShip.name]:    # Similar logic as weapons loop above this
-        newRoom = Room(X[0], X[1], X[2])     # The room's Size, System, and Vents 
-        whichShip.rooms.append(newRoom)
         if X[1] != "Empty":                  # Whilst we're at it, add systems in rooms to the systems list
             sysName = X[1]
             maxUpgradeableLevel = systemsDatabase[sysName]
         # Simultaneously define the System class w/ newly made parameters and add it to ship system dictionary
-            whichShip.systems[sysName] = System(sysName, maxUpgradeableLevel) # Add to ship system dict ---> "Name": System Object
+            #whichShip.systems[sysName] = System(sysName, maxUpgradeableLevel) # Add to ship system dict ---> "Name": System Object
+            addNewSystem = System(sysName, maxUpgradeableLevel)
+            whichShip.systems[sysName] = addNewSystem
+        else:
+            addNewSystem = X[1]
+
+        newRoom = Room(X[0], addNewSystem, X[2])     # The room's Size, System, and Vents 
+        whichShip.rooms.append(newRoom)
 
 
 def grantStartingWeapons(shipClass):
@@ -43,6 +48,7 @@ def grantStartingWeapons(shipClass):
                     shipClass.weapons[gun.name] = gun       # Add to ship weapon dictionary ---> "Name": Weapon Object 
                     continue
     #else enemy encounter weaponry
+
 
 # What if this is a seperate method of Ship and not a function?
 def otherShip(whoAreWe):
@@ -88,8 +94,8 @@ SECONDS = 0
 for gun in playerShip.weapons.values():
     gun.charge = 0                      # If pre-igniter in augments, gun.charge = cooldown
 playerShip.shield_recharge_progress = 0
-##### Begin combat in terms of seconds ######
-for x in range(1, 60):
+##### Begin combat in terms of seconds, continue until destroyed ######
+while enemyShip.destroyed == False:
     SECONDS += 1
 
     for thisPlayer in combatants:
@@ -113,10 +119,17 @@ for x in range(1, 60):
         break
 
 
-    time.sleep(0.1)
+    time.sleep(0.01)
 
 
+# print("\n ---------- A.A.R. ----------")
+# for room in enemyShip.rooms:
+#     print("Room: %s | Fires: %d | Breaches: %d" % (room.system, len(room.fires), len(room.breaches)) )
 
-        
+# for room in enemyShip.rooms:
+#     if room.system != "Empty":
+#         print("Room's System: %s | Power: %d | Damage: %d " % (room.system, room.system.power, room.system.damage)) 
+#     else:
+#         print("Room's System: %s ")    
 
 print("\n\n\n-----------------------------------------")
