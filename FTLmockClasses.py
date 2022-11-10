@@ -84,6 +84,9 @@ class Ship(object):
             ## Now evaluate what happens to the shields ##
                 shieldsPenetrated = False
                 damageDone = 0
+                #print("Gun type:", gun.type)
+                #print("Target shields:", target.shields)
+
                 if gun.type == "Beam":
                     if (gun.damage - target.shields) * gun.beam_length > 0:
                         shieldsPenetrated = True
@@ -126,7 +129,7 @@ class Ship(object):
 
                 if damageDone > 0:
                     target.hull -= damageDone
-                    print(f"-- Target room: {room_targetted.system} | {target}'s Hull: {target.hull}")
+                    print(f"-- Target room: {room_targetted.system} | {target}'s Hull: {target.hull}") # Debugging
 
                 if target.hull <= 0:
                     target.destroyed = True
@@ -221,13 +224,14 @@ class Room(object):
 
 
 class System(object):
-    power = 2           # Amount of power in system
+    power = 1           # Amount of power in system
     systemLevel = 2     # Current Upgraded level of System. Can take up to this much power
     damage = 0
     ion_damage = 0
 
-    def __init__(self, name, maxUpgradeableLevel):
+    def __init__(self, name, startingSystemLevel, maxUpgradeableLevel):
         self.name = name
+        self.systemLevel = startingSystemLevel
         self.maxUpgradeableLevel = maxUpgradeableLevel
 
 

@@ -7,9 +7,14 @@ weaponsDatabase = { "Basic Laser": ["Laser",1,10,1,1,20],  "Burst Laser Mk II": 
                     "Ion Blast": ["Ion",1,8,1,1,10]
                 }
 
-# Maybe be startingGear, with weapons, drones, systems, crew, augmentations, maxWeapons and maxDrones...
-startingWeapons = {
-    "Kestral": ["Burst Laser Mk II", "Artemis"],
+# Maybe be startingGear, with weapons, drones, systems, systemsStartingLevel, crew, augmentations, maxWeapons and maxDrones...
+startingGear = {
+    "Kestral": [ ["Burst Laser Mk II", "Artemis"], [""], ["Shields","Engines","Weapons","Oxygen",
+                    "Medbay","Doors","Sensors","Piloting"], [2, 2, 3, 1, 1, 1, 1, 1], 
+                    ["Human", "Human", "Human"], [], 4, 2],
+    "Rebel Fighter": [ ["Basic Laser", "Artemis"], [""], ["Shields","Engines","Weapons","Oxygen",
+                    "Medbay","Piloting"], [2, 2, 3, 1, 1, 1], 
+                    ["Human", "Human", "Human"], [], 4, 2],
 }
 
 # Maybe make it proper 2d and not 1d?
@@ -19,7 +24,7 @@ roomsDatabase = {
                  [2,"Doors",2],[4,"Medbay",0],[2,"Sensors",0],[2,"Piloting",0] ],
     "Rebel Fighter": [  [4,"Weapons",0],[4,"Engines",0],[4,"Shields",0],[2,"Medbay",0],
                         [2,"Empty",0],[2,"Oxygen",0],[2,"Piloting",0] ],
-    "Auto Assault": [ [4,"Weapons",0],[4,"Engines",0],[4,"Shields",0] ]
+    "Auto Assault": [ [2,"Weapons",0],[2,"Drone Control",0],[2,"Piloting",0],[2,"Engines",0],[2,"Shields",0] ]
     }
 
 ## "Name of System" : maxLevel
