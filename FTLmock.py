@@ -31,22 +31,48 @@ def generateRooms(whichShip):
             maxUpgradeableLevel = systemsDatabase[sysName]
         # Simultaneously define the System class w/ newly made parameters and add it to ship system dictionary
             #whichShip.systems[sysName] = System(sysName, maxUpgradeableLevel) # Add to ship system dict ---> "Name": System Object
-            addNewSystem = System(sysName, maxUpgradeableLevel)
+            addNewSystem = System(sysName, 1, maxUpgradeableLevel)
             whichShip.systems[sysName] = addNewSystem
         else:
             addNewSystem = X[1]
 
-        newRoom = Room(X[0], addNewSystem, X[2])     # The room's Size, System, and Vents 
+        newRoom = Room(X[0], addNewSystem, X[2])     # The room's Size, SystemClass, and Vents 
         whichShip.rooms.append(newRoom)
 
 
-def grantStartingWeapons(shipClass):
+def grantStartingGear(shipClass, startingGear, weaponsDatabase):
+    for selectShip in startingGear:
+        if selectShip == shipClass.name:
+        
+        ### Get Weapons ###
+            for desire in startingGear[selectShip][0]: 
+                for gun in weaponsCollection:                   
+                    if desire == gun.name:                      
+                        shipClass.weapons[gun.name] = gun       # Add to ship weapon dictionary ---> "Name": Weapon Object 
+                        continue
+
+        ### Get Drones ###
+        ### MISSING ####
+
+        ### Set starting levels of systems ###
+            sysData = zip(startingGear[selectShip][2], startingGear[selectShip][3])
+            for x in sysData:
+                sysName = x[0]
+                sysStartingLevel = x[1]
+
+                shipClass.systems[sysName].systemLevel = sysStartingLevel # Set system level from ship database
+                shipClass.systems[sysName].power = sysStartingLevel # Automatically give that system maximum power
+                #print("System name: %s | System level: %d | Power: %d" % (sysName, shipClass.systems[sysName].systemLevel, shipClass.systems[sysName].power) )
+
+
+        
+        else:
+            continue
+
+
+
     if shipClass.name in playableShipsCollection:           # Find weapons for a player's ship. 
-        for desire in startingWeapons[shipClass.name]: 
-            for gun in weaponsCollection:                   
-                if desire == gun.name:                      
-                    shipClass.weapons[gun.name] = gun       # Add to ship weapon dictionary ---> "Name": Weapon Object 
-                    continue
+        pass
     #else enemy encounter weaponry
 
 
@@ -75,18 +101,17 @@ SCRAP = 20
 FUEL = 13
 # missiles and drone_parts variables are found in ship classes.
 
-
 print("-----------------------------------------\n\n\n")
 
 
 playerShip = Ship("Kestral", playableShipsCollection)
 enemyShip = Ship("Rebel Fighter", playableShipsCollection)
 
-playerShip.grantStartingWeapons(playableShipsCollection, startingWeapons, weaponsCollection)
-# Insert Enemy grantStartingWeapons    once I finish adding enemy weapon logic
-
 generateRooms(playerShip)
 generateRooms(enemyShip)
+
+grantStartingGear(playerShip, startingGear, weaponsCollection)
+grantStartingGear(enemyShip, startingGear, weaponsCollection)
 
 ##### Start of combat touch-up ######
 combatants = [playerShip, enemyShip]
@@ -101,14 +126,14 @@ while enemyShip.destroyed == False:
     for thisPlayer in combatants:
         if "Shields" in thisPlayer.systems:
             thisPlayer.rejuvenateShield(thisPlayer.systems["Shields"])
+        
+        for gun in thisPlayer.weapons.values(): # All weapons not ready will charge up 1 second
+            if gun.charge < gun.cooldown:
+                gun.charge += 1
 
-    #print(f'Enemy shields: {enemyShip.shields}') 
+        checkWeaponStatus(thisPlayer)
 
-    for gun in playerShip.weapons.values(): # All weapons not ready will charge up 1 second
-        if gun.charge < gun.cooldown:
-            gun.charge += 1
 
-    checkWeaponStatus(playerShip)
     if otherShip(playerShip).destroyed == True: # You won the fight
         print("\n%s has been destroyed! Well done. Precluding combat." % otherShip(playerShip) )
         # Earn rewards
