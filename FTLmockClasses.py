@@ -20,7 +20,7 @@ class Ship(object):
     shields = 0
     shield_recharge_progress = 0
     shield_recharge_speed = 3 # Determined by manning crew, etc. Constant set to 3 seconds for now.
-    evasion = 15
+    evasion = 0
     oxygen = 100
 
     # Might need to add "rooms" parameter
@@ -29,6 +29,7 @@ class Ship(object):
 
         self.weapons = {}
         self.systems = {}
+        self.crew = []
         self.augments = []
         self.rooms = []
         self.storage = []
@@ -37,10 +38,12 @@ class Ship(object):
             self.hull = 30
             self.missiles = 12      # ! Import from StartingGear the proper starting missiles
             self.drone_parts = 0    # Ditto
+            self.isPlayer = True
         else:
             self.hull = randint(5, 15) # Should be bigger for bigger ships
             self.missiles = randint(5, 10)
             self.drone_parts = randint(4, 8)
+            self.isPlayer = False
 
     def __repr__(self):
         return self.name
@@ -67,6 +70,36 @@ class Ship(object):
                 self.shields += 1
                 self.shield_recharge_progress = 0
 
+    def checkEvasion(self):
+        dodgeFromEngines = [5, 10, 15, 20, 25, 28, 31, 35]
+        dodgeFromCrewLevel = [5, 7, 10]
+        autoPilotDodgeMultiplier = 1 # No evasion if there is no pilot (unless auto-pilot)
+        dodgeFromPiloting = 0#      Remove when logic below is complete
+        dodgeFromEngineering = 0#   Remove when logic below is complete
+
+        ## if any friendly crew in piloting room and Piloting has power:
+        ##      autoPilotDodgeMultiplier = 1
+        ## if no crew in piloting room AND piloting power == 3:
+        ##      autoPilotDodgeMultiplier = 0.8
+        ## if no crew in piloting room AND piloting power == 2:
+        ##      autoPilotDodgeMultiplier = 0.5       
+        ## else:
+        ##      autoPilotDodgeMultiplier = 0
+
+        ##if self.systems["Piloting"].manned == True:
+        ##    #dodgeFromPiloting = dodgeFromCrewLevel[crew.level]    # OR SOMETHING IDK
+        ##    print("BUG TESTING - You need to double-check evasion bonus from manning pilots & engines")
+        ##else:
+        ##    dodgeFromPiloting = 0
+
+        ##if self.systems["Engines"].manned == True:
+        ##    #dodgeFromEngineering = dodgeFromCrewLevel[crew.level]    # OR SOMETHING IDK
+        ##    print("BUG TESTING - You need to double-check evasion bonus from manning pilots & engines")
+        ##else:
+        ##    dodgeFromEngineering = 0
+
+        # Evasion = (Power in engines + crew in Pilots/Engines) * Multiplier from auto-pilot
+        self.evasion = (dodgeFromEngines[self.systems["Engines"].power] + dodgeFromPiloting + dodgeFromEngineering)*autoPilotDodgeMultiplier
 
     # Needs more work
     def fireWeapon(self, gun, target):
@@ -202,21 +235,22 @@ class Weapon(object):
 # Each room should have spaces for people, # of vents, breaches, fire, o2 in the room, and a system.
 # A ship has a list of room OBJECTS, whose data is pulled from a dictionary  
 class Room(object):
-    oxygen = 100
-
     def __init__(self, size, system, vents):
         self.size = size
         self.system = system
         self.vents = vents
+        self.oxygen = 100
 
+        self.crewInRoom = {
+            "friendly": [],
+            "enemy":    []
+            }
         self.fires = [] # List containing health of each fire. # of fires is len of the list.   
         self.breaches = [] # Ditto
 
     def __repr__(self):
-        if self.size == 2:
-            return "Small - %s" % self.system
-        elif self.size == 4:
-            return "Big - %s" % self.system
+        return self.system.name
+
 
     # function to add fires
     # function to add breaches
@@ -230,9 +264,16 @@ class System(object):
     ion_damage = 0
 
     def __init__(self, name, startingSystemLevel, maxUpgradeableLevel):
+        mannableSystems = ["Piloting", "Shields", "Weapons", "Engines", "Sensors", "Doors"]
+
         self.name = name
         self.systemLevel = startingSystemLevel
         self.maxUpgradeableLevel = maxUpgradeableLevel
+
+        if self.name in mannableSystems:
+            self.manned = False
+        else:
+            self.manned = "Not possible"
 
 
     def __repr__(self):
@@ -243,6 +284,7 @@ class System(object):
         if self.power < 0:
             self.power = 0
 
+        # Is this necessary at all? I think it can be included in rejuvenate shields
         if systemBlasted.name == "Shields":
             shipClass.shields = floor(systemBlasted.power / 2)
 
@@ -251,6 +293,7 @@ class System(object):
         #    pass 
 
         # etc for other systems
+ 
 
 
     def powerUp(self):
@@ -277,22 +320,157 @@ class Drone(object):
         self.name = name
         self.type = type
 
-# Allegiance is either "player", or "enemy"
 class Crew(object):
-    health = 100 # ! Exceptions needed for Zoltan, Rock, Crystal
-    allegiance = ""
-    speed = 1
+    # Variables defined in __init__ --> [self.name, self.species, self.location, self.locationIndex, self.destinationIndex]
+  # A crewmember will do these tasks in this order when sitting still.
+    taskPriority = ("Fight", "Fight fire", "Repair breach", "Repair system", "Man system", "Idle") # ! Drones should not have behavior!
+    current_task = "Idle"
+    movementProgress = 0
 
-    def __init__(self, name, species):
-        self.name = name
+    def __init__(self, species, shipOnboard, crewNameDatabase):
+        self.name = choice(crewNameDatabase) # Name should be dependent on species
         self.species = species
+        self.shipOnboard = shipOnboard  # Which ship is this crewmember on?
+        shipOnboard.crew.append(self)   # Add this crewmember to Ship's crew list
 
-        self.skills = {
-        "Piloting": 0,
-        "Engines": 0,
-        "Shields": 0,
-        "Weapons": 0,
-        "Fighting": 0,
-        "Repairing": 0
+        self.experience_skills = {   # Current Level 0/2, Current XP, XP needed to level up
+            "Piloting":     [0, 0, 15],
+            "Engines":      [0, 0, 15],
+            "Shields":      [0, 0, 55],
+            "Weapons":      [0, 0, 65],
+            "Fighting":     [0, 0, 8],
+            "Repairing":    [0, 0, 18],
         }
-        self.location = randint(5) # Random spawn location    
+        self.stats = {
+            "Allegiance": "friendly",
+            "Health": 100,                      # Rock, Crystal, Zoltan, Drones
+            "Damage": 1,                # Random damage modifier. 0.5 for Engi, 1.5 for Mantis
+            "Repair speed": 1,                  # Engi, Mantis, Repair Drone
+            "Movement speed": 1,                # Mantis, Rock, Lanius, Crystal, Drones
+            "Fire fighting speed": 1,           # Mantis=0.5 | Crystal=0.83 | Rock=1.67 | Engi=2
+            "Suffocation damage": 1,            # Crystal=0.5 | Lanius=0 | Drones=0
+            "Store cost": 45,                   # Depends on species
+            #"Crew Rarity": 1,                  # Rarity dependent on sector
+        # -- ABILITIES -- # 
+            "Zoltan power": False,              # Zoltan
+            "Death explosion": False,           # Zoltan
+            "Reveals nearby rooms": False,      # Slug
+            "Mind control immunity": False,     # Slug, Drones
+            "Fire immunity": False,             # Rock, Drones
+            "Drains oxygen": False,             # Lanius
+            "Lockdown ability": False           # Crystal
+        }
+
+        self.generateCrew(species, shipOnboard) # Set starting stats dependent on species
+        self.spawnLocation(shipOnboard, shipOnboard.isPlayer) # Find starting location
+
+    def __repr__(self):
+        return "%s | %s > %s" % (self.name, self.species, self.location)
+
+
+  # Set starting stats dependent on species.
+    def generateCrew(self, species, parentShip):
+
+        if parentShip.isPlayer == False:
+            self.stats["Allegiance"] = "enemy"
+
+
+        if species == "Human":
+            for skill in self.experience_skills: # 10% Lower XP needed to level up
+                self.experience_skills[skill][2] = float(self.experience_skills[skill][2])   # To be reduced by 10%, it must be converted into a floating number
+                self.experience_skills[skill][2] = floor(self.experience_skills[skill][2]*0.9) 
+                self.experience_skills[skill][2] = int(self.experience_skills[skill][2])     # Re-convert back to integer
+        elif species == "Engi":
+            self.stats["Store cost"] = 50
+            self.stats["Damage"] = 0.5
+            self.stats["Repair speed"] = 2
+            self.stats["Fire fighting speed"] = 2
+        elif species == "Zoltan":
+            self.stats["Store cost"] = 60
+            self.stats["Health"] = 70
+            self.stats["Zoltan power"] = True
+            self.stats["Death explosion"] = True
+        elif species == "Rockman":
+            self.stats["Store cost"] = 55
+            self.stats["Health"] = 150    
+            self.stats["Movement speed"] = 0.5
+            self.stats["Fire fighting speed"] = 1.67
+            self.stats["Fire immunity"] = True       
+        # elif species == "Mantis"
+        # elif species == "Lanius"
+        # elif species == "Slug"
+        # elif species == "Crystal"  
+        # elif species == "Boarding Drone" / "Repair Drone" / "Ion Intruder" / "Anti-Personnel Drone"          
+
+
+  # Spawn crewmember in piloting if your ship; pre-determined important systems if enemy. 
+    def spawnLocation(self, parentShip, isPlayer):
+        # Spawn in piloting. If full, try room adjacent to the left.
+        if isPlayer == True:
+            for index in range( len(parentShip.rooms)-1 , 0, -1):
+                room = parentShip.rooms[index]
+                if len(room.crewInRoom["friendly"]) < room.size: # If the room isn't full, spawn there
+                    self.location = room
+                    self.locationIndex = index
+                    room.crewInRoom["friendly"].append(self)
+                    self.destinationIndex = self.locationIndex
+                    break
+            else:
+                print("ERROR - Could not find a room for %s!" % (self.name))
+
+
+        elif isPlayer == False:
+            # When spawning in a ship, attempt to spawn at least 1 crew in these rooms, in this priority
+            spawnRoomPriority = ["Piloting", "Weapons", "Shields", "Engine", "Medbay", "Teleporter"]       
+            for roomPriority in spawnRoomPriority:
+                index = 0
+
+                if roomPriority not in parentShip.systems: # If room does not exist, skip to next check
+                    continue
+                for roomIndex, checkingShipRoom in enumerate(parentShip.rooms):
+                    if checkingShipRoom.system != "Empty" and checkingShipRoom.system.name == roomPriority:
+                        room = checkingShipRoom
+                        index = roomIndex
+
+                if len(room.crewInRoom["enemy"]) == 0: # If the room is empty, spawn there
+                    self.location = room
+                    self.locationIndex = index
+                    room.crewInRoom["enemy"].append(self)
+                    self.destinationIndex = self.locationIndex
+                    break
+            else:   
+                print("\n! PROBLEM - Could not find a room for this crew to spawn in!\n")
+                # Try randomizing room index spawn location for this.
+
+
+    def moveAction(self):
+        self.movementProgress += self.stats["Movement speed"]
+
+        while self.movementProgress >= 1:
+            self.movementProgress -= 1
+
+            # Exit room, go to right room and change current location, enter room
+            if self.locationIndex < self.destinationIndex: # Move Right
+                self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].remove(self) # ! Might cause a bug!
+                self.locationIndex += 1
+                self.location = self.shipOnboard.rooms[self.locationIndex]
+                self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].append(self)
+
+                
+            # Exit room, go to left room and change current location, enter room
+            elif self.locationIndex > self.destinationIndex:
+                self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].remove(self) # ! Might cause a bug!
+                self.locationIndex -= 1
+                self.location = self.shipOnboard.rooms[self.locationIndex]
+                self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].append(self)
+
+
+        if self.locationIndex == self.destinationIndex: # Announce arrival to destination
+            print(f"[% {self.name} has arrived in {self.location}.")
+
+
+    def evaluateTask(self):
+        pass
+
+
+    #def earnXP(self)

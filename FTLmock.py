@@ -22,22 +22,6 @@ for gun in weaponsDatabase:
     weaponsCollection.append(newWeapon)
 weaponsCollection = tuple(weaponsCollection) # Solidify list by turning into tuple
 
-# Transform room dictionary into a list of Room objects and add them to the inputted ship
-# Parameter must take the Ship object
-def generateRooms(whichShip):
-    for X in roomsDatabase[whichShip.name]:    # Similar logic as weapons loop above this
-        if X[1] != "Empty":                  # Whilst we're at it, add systems in rooms to the systems list
-            sysName = X[1]
-            maxUpgradeableLevel = systemsDatabase[sysName]
-        # Simultaneously define the System class w/ newly made parameters and add it to ship system dictionary
-            #whichShip.systems[sysName] = System(sysName, maxUpgradeableLevel) # Add to ship system dict ---> "Name": System Object
-            addNewSystem = System(sysName, 1, maxUpgradeableLevel)
-            whichShip.systems[sysName] = addNewSystem
-        else:
-            addNewSystem = X[1]
-
-        newRoom = Room(X[0], addNewSystem, X[2])     # The room's Size, SystemClass, and Vents 
-        whichShip.rooms.append(newRoom)
 
 
 def grantStartingGear(shipClass, startingGear, weaponsDatabase):
@@ -51,8 +35,19 @@ def grantStartingGear(shipClass, startingGear, weaponsDatabase):
                         shipClass.weapons[gun.name] = gun       # Add to ship weapon dictionary ---> "Name": Weapon Object 
                         continue
 
-        ### Get Drones ###
-        ### MISSING ####
+        ### Get Rooms ###
+            for X in roomsDatabase[shipClass.name]:    # Similar logic as weapons loop above this
+                if X[1] != "Empty":                  # Whilst we're at it, add systems in rooms to the systems list
+                    sysName = X[1]
+                    maxUpgradeableLevel = systemsDatabase[sysName]
+                # Simultaneously define the System class w/ newly made parameters and add it to ship system dictionary
+                    addNewSystem = System(sysName, 1, maxUpgradeableLevel)
+                    shipClass.systems[sysName] = addNewSystem
+                else:
+                    addNewSystem = X[1]
+
+                newRoom = Room(X[0], addNewSystem, X[2])     # The room's Size, SystemClass, and Vents 
+                shipClass.rooms.append(newRoom)
 
         ### Set starting levels of systems ###
             sysData = zip(startingGear[selectShip][2], startingGear[selectShip][3])
@@ -64,7 +59,11 @@ def grantStartingGear(shipClass, startingGear, weaponsDatabase):
                 shipClass.systems[sysName].power = sysStartingLevel # Automatically give that system maximum power
                 #print("System name: %s | System level: %d | Power: %d" % (sysName, shipClass.systems[sysName].systemLevel, shipClass.systems[sysName].power) )
 
+        ### Get Drones ###
 
+        ### Get crew ####
+            for person in startingGear[selectShip][4]:
+                Crew(person, shipClass, crewNameDatabase)
         
         else:
             continue
@@ -86,9 +85,9 @@ def otherShip(whoAreWe):
 
 def checkWeaponStatus(shipClass):
     for index, gun in enumerate(shipClass.weapons.values() ):
-        if gun.charge == gun.cooldown and gun.autoFire == True:
+        if gun.charge >= gun.cooldown and gun.autoFire == True:
             shipClass.fireWeapon(gun, otherShip(shipClass) )
-        elif gun.charge == gun.cooldown and gun.autoFire == False:
+        elif gun.charge >= gun.cooldown and gun.autoFire == False:
             #print("#%d [%s] %s - READY" % (index+1, "I"*gun.powerNeeded, gun) )
             pass
         elif gun.charge < gun.cooldown:
@@ -107,11 +106,11 @@ print("-----------------------------------------\n\n\n")
 playerShip = Ship("Kestral", playableShipsCollection)
 enemyShip = Ship("Rebel Fighter", playableShipsCollection)
 
-generateRooms(playerShip)
-generateRooms(enemyShip)
 
 grantStartingGear(playerShip, startingGear, weaponsCollection)
-grantStartingGear(enemyShip, startingGear, weaponsCollection)
+grantStartingGear(enemyShip, startingGear, weaponsCollection)       # Bug occurs when calling enemy ship!
+
+#playerShip.crew[0].destinationIndex = 1    # First crewmember goes to Kestrel's 2nd room (engines)
 
 ##### Start of combat touch-up ######
 combatants = [playerShip, enemyShip]
@@ -126,12 +125,19 @@ while enemyShip.destroyed == False:
     for thisPlayer in combatants:
         if "Shields" in thisPlayer.systems:
             thisPlayer.rejuvenateShield(thisPlayer.systems["Shields"])
+
+        thisPlayer.checkEvasion() # Double check if evasion has changed
         
         for gun in thisPlayer.weapons.values(): # All weapons not ready will charge up 1 second
             if gun.charge < gun.cooldown:
                 gun.charge += 1
 
         checkWeaponStatus(thisPlayer)
+
+        for crewMember in thisPlayer.crew: # All crewmembers move 1 step closer to their destination
+            if crewMember.locationIndex != crewMember.destinationIndex:
+                crewMember.moveAction()
+            # re-check action
 
 
     if otherShip(playerShip).destroyed == True: # You won the fight
@@ -148,6 +154,7 @@ while enemyShip.destroyed == False:
 
 
 # print("\n ---------- A.A.R. ----------")
+print(f"Combat has finished after {SECONDS} seconds." )
 # for room in enemyShip.rooms:
 #     print("Room: %s | Fires: %d | Breaches: %d" % (room.system, len(room.fires), len(room.breaches)) )
 

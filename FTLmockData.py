@@ -21,7 +21,7 @@ startingGear = {
 ## "Name of Ship" : [ [Size of room, System within room, # of vents], etc...  ]
 roomsDatabase = {
     "Kestral": [ [2,"Empty",2],[4,"Engines",0],[2,"Oxygen",0],[4,"Weapons",0],[4,"Shields",0],
-                 [2,"Doors",2],[4,"Medbay",0],[2,"Sensors",0],[2,"Piloting",0] ],
+                 [2,"Doors",2],[3,"Medbay",0],[2,"Sensors",0],[2,"Piloting",0] ],
     "Rebel Fighter": [  [4,"Weapons",0],[4,"Engines",0],[4,"Shields",0],[2,"Medbay",0],
                         [2,"Empty",0],[2,"Oxygen",0],[2,"Piloting",0] ],
     "Auto Assault": [ [2,"Weapons",0],[2,"Drone Control",0],[2,"Piloting",0],[2,"Engines",0],[2,"Shields",0] ]
@@ -47,4 +47,7 @@ encounterShipsCollection = ("Slug Interceptor", "Auto Scout", "Auto Assault", "R
 
 playableShipsCollection = ("Kestral", "Nissan", "Osprey", "Red-Tail") # Fill this up later
 
+# Change this to be a dictionary with different species as its key
+crewNameDatabase = ("Jeff", "Ivan", "Katherine", "Raven", "Zach", "Ainsley", "Sasha", "Kaladin",
+                "Lexica", "Koloianov", "Berk", "Justeen", "Dillonovich") 
 
