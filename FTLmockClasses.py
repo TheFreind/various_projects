@@ -151,10 +151,10 @@ class Ship(object):
                     roll_to_add_breach = randint(1, 100)
                     #roll_to_stun = randint(1, 100)
                     if roll_to_add_fire <= gun.fire_chance and len(room_targetted.fires) < room_targetted.size: # Max fires = size of room
-                        room_targetted.fires.append(40) # Add a 40 health fire to the fire list
+                        room_targetted.fires.append(40) # Add a 10 health fire to the fire list
                         print("-! Fire started!")
                     if roll_to_add_breach <= gun.breach_chance and len(room_targetted.breaches) < room_targetted.size:
-                        room_targetted.breaches.append(40)
+                        room_targetted.breaches.append(10)
                         print("-! Hull breached!")
                     #if roll_to_stun <= gun.stun_chance:
                     #    pass           
@@ -204,7 +204,7 @@ class Weapon(object):
             self.system_damage = self.damage
             self.crew_damage = self.system_damage * 15
 
-            if type == "Laser" or type == "Beam":       # Side effects dependent on weapon type. Chances represented in percentages. 
+            if type == "Laser" or type == "Beam" or type == "Missile":       # Side effects dependent on weapon type. Chances represented in percentages. 
                 self.fire_chance = 10                       # However, it needs to be more refined.
             if type == "Laser" or type == "Missile":
                 self.breach_chance = 10
@@ -235,15 +235,16 @@ class Weapon(object):
 # Each room should have spaces for people, # of vents, breaches, fire, o2 in the room, and a system.
 # A ship has a list of room OBJECTS, whose data is pulled from a dictionary  
 class Room(object):
-    def __init__(self, size, system, vents):
+    def __init__(self, size, system, vents, parentShip):
         self.size = size
         self.system = system
         self.vents = vents
         self.oxygen = 100
+        self.parentShip = parentShip
 
         self.crewInRoom = {
             "friendly": [],
-            "enemy":    []
+            "hostile":    []
             }
         self.fires = [] # List containing health of each fire. # of fires is len of the list.   
         self.breaches = [] # Ditto
@@ -258,9 +259,11 @@ class Room(object):
 
 
 class System(object):
-    power = 1           # Amount of power in system
-    systemLevel = 2     # Current Upgraded level of System. Can take up to this much power
-    damage = 0
+    power = 1               # Amount of power in system
+    systemLevel = 2         # Current Upgraded level of System. Can take up to this much power
+    repairProgress = 0      # Repair 1 power bar when >= 10. Crew repairing systems contribute.
+    damageProgress = 0      # Increment 1 damage when >= 10. Hostiles destroying systems contribute.
+    damage = 0              # Damage to system prevents power intake to the system.
     ion_damage = 0
 
     def __init__(self, name, startingSystemLevel, maxUpgradeableLevel):
@@ -293,6 +296,15 @@ class System(object):
         #    pass 
 
         # etc for other systems
+
+    # A system will lose all repair/damage progress if all friendlies/hostiles leave the room before fixing/destroying the system.
+    def checkCrewPresence(self, room):
+        if ((len(room.crewInRoom["friendly"]) == 0 and room.parentShip.isPlayer == True) or
+            (len(room.crewInRoom["hostile"]) == 0 and room.parentShip.isPlayer == False) ):
+            room.system.repairProgress = 0
+        if ((len(room.crewInRoom["friendly"]) == 0 and room.parentShip.isPlayer == False) or
+            (len(room.crewInRoom["hostile"]) == 0 and room.parentShip.isPlayer == True) ):
+            room.system.damageProgress = 0
  
 
 
@@ -323,7 +335,8 @@ class Drone(object):
 class Crew(object):
     # Variables defined in __init__ --> [self.name, self.species, self.location, self.locationIndex, self.destinationIndex]
   # A crewmember will do these tasks in this order when sitting still.
-    taskPriority = ("Fight", "Fight fire", "Repair breach", "Repair system", "Man system", "Idle") # ! Drones should not have behavior!
+    taskPriority = ("Fight", "Destroy System", "Fight fire", "Repair breach", 
+                    "Repair system", "Reposition", "Man system", "Idle") # ! Drones should not have behavior!
     current_task = "Idle"
     movementProgress = 0
 
@@ -347,7 +360,7 @@ class Crew(object):
             "Damage": 1,                # Random damage modifier. 0.5 for Engi, 1.5 for Mantis
             "Repair speed": 1,                  # Engi, Mantis, Repair Drone
             "Movement speed": 1,                # Mantis, Rock, Lanius, Crystal, Drones
-            "Fire fighting speed": 1,           # Mantis=0.5 | Crystal=0.83 | Rock=1.67 | Engi=2
+            "Fire fighting speed": 4,           # Mantis=0.5 | Crystal=0.83 | Rock=1.67 | Engi=2
             "Suffocation damage": 1,            # Crystal=0.5 | Lanius=0 | Drones=0
             "Store cost": 45,                   # Depends on species
             #"Crew Rarity": 1,                  # Rarity dependent on sector
@@ -372,7 +385,7 @@ class Crew(object):
     def generateCrew(self, species, parentShip):
 
         if parentShip.isPlayer == False:
-            self.stats["Allegiance"] = "enemy"
+            self.stats["Allegiance"] = "hostile"
 
 
         if species == "Human":
@@ -403,7 +416,7 @@ class Crew(object):
         # elif species == "Boarding Drone" / "Repair Drone" / "Ion Intruder" / "Anti-Personnel Drone"          
 
 
-  # Spawn crewmember in piloting if your ship; pre-determined important systems if enemy. 
+  # Spawn crewmember in piloting if your ship; pre-determined important systems if hostile. 
     def spawnLocation(self, parentShip, isPlayer):
         # Spawn in piloting. If full, try room adjacent to the left.
         if isPlayer == True:
@@ -413,6 +426,7 @@ class Crew(object):
                     self.location = room
                     self.locationIndex = index
                     room.crewInRoom["friendly"].append(self)
+                    self.roomPositionIndex = len(room.crewInRoom["friendly"]) - 1
                     self.destinationIndex = self.locationIndex
                     break
             else:
@@ -432,10 +446,11 @@ class Crew(object):
                         room = checkingShipRoom
                         index = roomIndex
 
-                if len(room.crewInRoom["enemy"]) == 0: # If the room is empty, spawn there
+                if len(room.crewInRoom["hostile"]) == 0: # If the room is empty, spawn there
                     self.location = room
                     self.locationIndex = index
-                    room.crewInRoom["enemy"].append(self)
+                    room.crewInRoom["hostile"].append(self)
+                    self.roomPositionIndex = len(room.crewInRoom["hostile"]) - 1
                     self.destinationIndex = self.locationIndex
                     break
             else:   
@@ -449,28 +464,134 @@ class Crew(object):
         while self.movementProgress >= 1:
             self.movementProgress -= 1
 
-            # Exit room, go to right room and change current location, enter room
+            # Exit room, go to right/Left room and change current location, enter room
+            self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].remove(self)
+            
             if self.locationIndex < self.destinationIndex: # Move Right
-                self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].remove(self) # ! Might cause a bug!
                 self.locationIndex += 1
-                self.location = self.shipOnboard.rooms[self.locationIndex]
-                self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].append(self)
-
-                
-            # Exit room, go to left room and change current location, enter room
-            elif self.locationIndex > self.destinationIndex:
-                self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].remove(self) # ! Might cause a bug!
+            elif self.locationIndex > self.destinationIndex: # Move Left
                 self.locationIndex -= 1
-                self.location = self.shipOnboard.rooms[self.locationIndex]
-                self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].append(self)
 
+            self.location = self.shipOnboard.rooms[self.locationIndex]
+            self.shipOnboard.rooms[self.locationIndex].crewInRoom[self.stats["Allegiance"]].append(self)
+            self.roomPositionIndex = len(self.location.crewInRoom[self.stats["Allegiance"]]) - 1
 
+        # Potential bug - what happens when you reach your location with leftover movement?
+        #   i.e. Mantis/Mantis pheromones providing that
         if self.locationIndex == self.destinationIndex: # Announce arrival to destination
             print(f"[% {self.name} has arrived in {self.location}.")
 
 
     def evaluateTask(self):
-        pass
+        if ( (self.stats["Allegiance"] == "friendly" and len(self.location.crewInRoom["hostile"]) > 0) or 
+            (self.stats["Allegiance"] == "hostile" and len(self.location.crewInRoom["friendly"]) > 0) ):
+            print("DEBUGGING - Fight boarders")
+            pass # Do combat
+
+        # If present in enemy system, start destroying it. You cannot trash a completely destroyed system!
+        elif ( self.location.system.name != "Empty" and self.location.system.damage < self.location.system.systemLevel and
+                (self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "friendly" or
+                self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "hostile") ):
+            self.destroySystemAction()
+            
+        # If room has fires, firefight. Only extinguish fires on your own ship.
+        elif ( len(self.location.fires) > 0 and 
+                (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
+                self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
+            self.firefightingAction()
+
+        # If room has breaches, repair them. Only repair breaches on your own ship.
+        elif ( len(self.location.breaches) > 0 and 
+                (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
+                self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
+            self.repairBreachAction()
+
+        # If room's system is damaged, repair it. Only repair friendly systems.
+        elif ( self.location.system.damage > 0 and 
+                (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
+                self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
+            self.repairSystemAction()
+
+        #elif needtoreposition
+            #print("DEBUGGING - Reposition to man system / fight boarder")
+
+        elif self.location.system.manned == False:
+            self.location.system.manned = True
+
+
+        else:
+            pass # idle
+
+
+    #def combatAction(self):
+    #    if self.stats["Allegiance"] == "friendly":
+    #        target = self.location.crewInRoom["hostile"][self.roomPositionIndex] # Fight in same tile
+    #    elif self.stats["Allegiance"] == "hostile":
+    #       target = self.location.crewInRoom["friendly"][self.roomPositionIndex] 
+
+    def destroySystemAction(self):
+        self.location.system.damageProgress += 1 # All crew deal equal system damage
+
+        if self.location.system.damageProgress >= 10: # When system accumulates enough damage, damage a power bar.
+            self.location.system.damage += 1
+            
+            if self.location.system.damage == self.location.system.systemLevel:
+                self.location.parentShip.hull -= 1
+                print(" {! %s of %s has been destroyed!" % (self.location.system.name, self.location.parentShip.name) )
+
+        
+    def repairSystemAction(self):
+        # What happens to the system's power when repaired?
+        self.unmanSystemAction()
+        self.location.system.repairProgress += self.stats["Repair speed"]
+
+        if self.location.system.repairProgress >= 10: # When system accumulates enough repair, repair a power bar.
+            self.location.system.damage -= 1
+            
+            # Fully repaired notification
+            if self.location.system.damage == 0 and self.location.parentShip.isPlayer == True: 
+                print(" {+ %s is fully repaired." % (self.location.system.name) )
+            elif self.location.system.damage == 0 and self.location.parentShip.isPlayer == False:
+                print(" {- Enemy %s is fully repaired." % (self.location.system.name) )
+        
+    
+    def repairBreachAction(self):
+        self.unmanSystemAction()
+        self.location.breaches[0] -= self.stats["Repair speed"] # First breach in list 'loses' health at the rate of repair speed.
+
+        if self.location.breaches[0] <= 0: 
+            del self.location.breaches[0]
+            
+            # All breaches repaired notification
+            if len(self.location.breaches) == 0 and self.location.parentShip.isPlayer == True:
+                print(" {+ All breaches in %s are repaired." % (self.location.system.name) )
+
+
+    def firefightingAction(self):
+        self.unmanSystemAction()
+        self.location.fires[0] -= self.stats["Fire fighting speed"] # First fire in list 'loses' health at the rate of fire fighting speed.
+
+        if self.location.fires[0] <= 0: 
+            del self.location.fires[0]
+            
+            # If all fires in a room are extinguished, check to see if all fires on ship are extinguished. Notification if so.
+            if len(self.location.fires) == 0 and self.location.parentShip.isPlayer == True:
+                print(" {+ All fires in %s are depleted." % (self.location.system.name) )
+                firesFound = 0
+                for room in self.location.parentShip.rooms:
+                    firesFound += len(room.fires)
+                    if firesFound > 0:
+                        break
+
+                else:
+                    print(" {+ All fires onboard %s have been extinguished!" % (self.location.parentShip.name) )        
+
+    # Doing any action will force the crewmember to unman the system, if it is mannable to begin with.
+    def unmanSystemAction(self):
+        if self.location.system.manned != "Not possible":
+            self.location.system.manned = False
+
+
 
 
     #def earnXP(self)
