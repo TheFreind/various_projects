@@ -7,6 +7,16 @@
 #   - Enemy weapons target random rooms (or give them targetting AI)
 # WHAT IF I ADD MY OWN IDEAS OF FTL HERE??!?!?
 
+# THINGS TO ADD LATER:
+#   Fire needs to spreading mechanics
+#   The whole oxygen system
+#   Opening vents
+
+# UNTESTED FEATURES
+# Destroying enemy systems (crew.destroySystemAction)
+# Boarding and fighting crewmembers (crew.combatAction)
+
+
 import time
 from random import randint, choice
 from FTLmockData import * # Dictionaries info
@@ -46,7 +56,7 @@ def grantStartingGear(shipClass, startingGear, weaponsDatabase):
                 else:
                     addNewSystem = X[1]
 
-                newRoom = Room(X[0], addNewSystem, X[2])     # The room's Size, SystemClass, and Vents 
+                newRoom = Room(X[0], addNewSystem, X[2], shipClass)     # The room's Size, SystemClass, Vents, and ship its a part of 
                 shipClass.rooms.append(newRoom)
 
         ### Set starting levels of systems ###
@@ -110,7 +120,7 @@ enemyShip = Ship("Rebel Fighter", playableShipsCollection)
 grantStartingGear(playerShip, startingGear, weaponsCollection)
 grantStartingGear(enemyShip, startingGear, weaponsCollection)       # Bug occurs when calling enemy ship!
 
-#playerShip.crew[0].destinationIndex = 1    # First crewmember goes to Kestrel's 2nd room (engines)
+playerShip.crew[0].destinationIndex = 1    # First crewmember goes to Kestrel's 2nd room (engines)
 
 ##### Start of combat touch-up ######
 combatants = [playerShip, enemyShip]
@@ -134,10 +144,19 @@ while enemyShip.destroyed == False:
 
         checkWeaponStatus(thisPlayer)
 
+        for room in thisPlayer.rooms:
+            if room.system != "Empty":
+                room.system.checkCrewPresence(room)
+
         for crewMember in thisPlayer.crew: # All crewmembers move 1 step closer to their destination
+            # if stunned, skip this second and count down stun duration
+            #
             if crewMember.locationIndex != crewMember.destinationIndex:
                 crewMember.moveAction()
-            # re-check action
+            else:
+                crewMember.evaluateTask()
+            # re-check task priorities
+            # if found something to do, un-man your station 
 
 
     if otherShip(playerShip).destroyed == True: # You won the fight
