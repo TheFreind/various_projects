@@ -49,5 +49,6 @@ playableShipsCollection = ("Kestral", "Nissan", "Osprey", "Red-Tail") # Fill thi
 
 # Change this to be a dictionary with different species as its key
 crewNameDatabase = ("Jeff", "Ivan", "Katherine", "Raven", "Zach", "Ainsley", "Sasha", "Kaladin",
-                "Lexica", "Koloianov", "Berk", "Justeen", "Dillonovich") 
+                "Lexica", "Koloianov", "Berk", "Justeen", "Dillonovich", "Sonaki", "Falon", "Ihan",
+                "Osiris", "Penn", "Raymond", "Makella", "Charlotte", "Terri") 
 

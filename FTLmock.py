@@ -11,10 +11,11 @@
 #   Fire needs to spreading mechanics
 #   The whole oxygen system
 #   Opening vents
+#   Fire needs to damage
+#   Drones
 
 # UNTESTED FEATURES
-# Destroying enemy systems (crew.destroySystemAction)
-# Boarding and fighting crewmembers (crew.combatAction)
+# XP
 
 
 import time
@@ -118,9 +119,34 @@ enemyShip = Ship("Rebel Fighter", playableShipsCollection)
 
 
 grantStartingGear(playerShip, startingGear, weaponsCollection)
-grantStartingGear(enemyShip, startingGear, weaponsCollection)       # Bug occurs when calling enemy ship!
+grantStartingGear(enemyShip, startingGear, weaponsCollection)       
 
-playerShip.crew[0].destinationIndex = 1    # First crewmember goes to Kestrel's 2nd room (engines)
+#Testing scenario where all enemy crew board our ship in weapons
+#! This is a useful, basic template for the Teleporter
+#   for boarder in teleporter.room.crewInRoom:
+for boarder in enemyShip.crew:
+    boardingChoice = "Weapons"
+
+    # Fundamental problem - checkRoom.system.name not possible on "Empty" rooms b/c it's a string and not a system object
+    # What do I do if you board an "Empty" room? The code depends on that. Unless... its room index!
+    for roomIndex, checkRoom in enumerate(otherShip(boarder.shipOnboard).rooms):
+        if checkRoom.system != "Empty" and checkRoom.system.name == boardingChoice:
+            # MISSING CHECK - What if room is full of crew? Where do excess go?
+            boarder.location = checkRoom                            # Boarder is now in room
+            boarder.shipOnboard = checkRoom.parentShip              # Boarder is now in room's ship
+            boarder.locationIndex = roomIndex                       # Get this room's index in ship's list
+            boarder.destinationIndex = roomIndex                    # Boarder isn't immediately moving.
+            checkRoom.crewInRoom[boarder.stats["Allegiance"]].append(boarder)   # Add boarder to his team in room
+            boarder.roomPositionIndex = len(checkRoom.crewInRoom[boarder.stats["Allegiance"]]) - 1  # Get his tile in room
+
+            break
+    else:
+        print("%s does not exist onboard %s!" % (boardingChoice, boarder.shipOnboard.name) )
+
+    print("%s %s is in %s, onboard the %s." % (boarder.stats["Allegiance"], boarder.name, boarder.location, boarder.shipOnboard))
+
+
+playerShip.crew[0].destinationIndex = 3    # First crewmember goes to Kestrel's 4th room (weapons)
 
 ##### Start of combat touch-up ######
 combatants = [playerShip, enemyShip]
@@ -155,8 +181,35 @@ while enemyShip.destroyed == False:
                 crewMember.moveAction()
             else:
                 crewMember.evaluateTask()
-            # re-check task priorities
-            # if found something to do, un-man your station 
+
+        # ! Oxygen depletion not yet implemented
+        # Fire suppression augment should extinguish fires in this section of code.
+        for room in thisPlayer.rooms:
+            if len(room.fires) > 0:
+                if room.system != "Empty":  # System takes damage from fire
+                    room.system.damageProgress += 0.75 * len(room.fires)
+
+                    if room.system.damageProgress >= 10: # When system accumulates enough damage, damage a power bar.
+                        room.system.damage += 1
+                        room.system.damageProgress = 0
+
+                        if room.system.damage == room.system.systemLevel:
+                            room.parentShip.hull -= 1
+                            print(" [! %s of %s has been burned down by fire!" % (room.system.name, room.parentShip.name) )
+
+                for allegiance in room.crewInRoom:  # All crew in room take fire damage
+                    for crew in room.crewInRoom[allegiance]:
+                        if crew.stats["Fire immunity"] == False:
+                            crew.sufferDamage(5 * len(room.fires)) # 5 dmg per fire / second
+
+                # Deplete oxygen
+
+                # Fire spreads in room.
+                # ! Needs functionality to spread to other rooms
+                room.fireProgress += len(room.fires)
+                if room.fireProgress >= room.fireChance:
+                    room.startFire("Spread")
+
 
 
     if otherShip(playerShip).destroyed == True: # You won the fight
