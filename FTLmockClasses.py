@@ -17,6 +17,9 @@ from math import floor
 
 class Ship(object):
     destroyed = False
+    auto_ship = False
+    cloaked = False
+
     shields = 0
     shield_recharge_progress = 0
     shield_recharge_speed = 3 # Determined by manning crew, etc. Constant set to 3 seconds for now.
@@ -26,6 +29,7 @@ class Ship(object):
     # Might need to add "rooms" parameter
     def __init__(self, name, playableShipsCollection):
         self.name = name
+        
 
         self.weapons = {}
         self.systems = {}
@@ -36,8 +40,9 @@ class Ship(object):
 
         if name in playableShipsCollection:
             self.hull = 30
-            self.missiles = 12      # ! Import from StartingGear the proper starting missiles
+            self.missiles = 12      # Missiles imported from Data
             self.drone_parts = 0    # Ditto
+            self.reactor = 8        # Ditto
             self.isPlayer = True
         else:
             self.hull = randint(5, 15) # Should be bigger for bigger ships
@@ -61,45 +66,72 @@ class Ship(object):
     # So long as the ship has shields, that it has at least 2 power, and that it currently has less
     #   shield bubbles than its maximum, start rejuvenating them. 
     def rejuvenateShield(self, shieldClass): # Check if Ship has shields within the main code...
+        shieldLayerRechargeTime = [2, 2, 1.75, 1.5, 1.33]
+        crewMateSkillList = [1.10, 1.20, 1.30]
+        if self.systems["Shields"].manned == True:
+            crewBonus = crewMateSkillList[self.systems["Shields"].mannedCrewMate.experience_skills["Shields"][0]]
+        else:
+            crewBonus = 1
+        rechargeBooster = 1 # ! Shield Charge Booster augments is additive to this variable
+        
+        timeNeeded = shieldLayerRechargeTime[self.shields-1] * (1/crewBonus*rechargeBooster) 
+
+
         if shieldClass.power >= 2:
             
-            if self.shield_recharge_progress < 3 and self.shields < floor(shieldClass.power / 2): 
+            if (self.shield_recharge_progress < timeNeeded and self.shields < floor(shieldClass.power / 2) ): 
                 self.shield_recharge_progress += 1
 
             elif self.shields < floor(shieldClass.power / 2): 
                 self.shields += 1
                 self.shield_recharge_progress = 0
 
-    def checkEvasion(self):
-        dodgeFromEngines = [5, 10, 15, 20, 25, 28, 31, 35]
+    # Update and check if evasion changes. 
+    def checkEvasion(self, pilotingRoom, enginesRoom):
+        if self.isPlayer == True:
+            my_crew = "friendly"
+        else:
+            my_crew = "hostile"
+
+        if self.cloaked == True:
+            cloakEvasion = 60
+        else:
+            cloakEvasion = 0
+
+        dodgeFromEngines = [0, 5, 10, 15, 20, 25, 28, 31, 35]
         dodgeFromCrewLevel = [5, 7, 10]
-        autoPilotDodgeMultiplier = 1 # No evasion if there is no pilot (unless auto-pilot)
-        dodgeFromPiloting = 0#      Remove when logic below is complete
-        dodgeFromEngineering = 0#   Remove when logic below is complete
+        autoPilotDodgeMultiplier = [0, 0, 0.5, 0.8] # Piloting power = index accesed from this. Or 1 if there is pilot.
 
-        ## if any friendly crew in piloting room and Piloting has power:
-        ##      autoPilotDodgeMultiplier = 1
-        ## if no crew in piloting room AND piloting power == 3:
-        ##      autoPilotDodgeMultiplier = 0.8
-        ## if no crew in piloting room AND piloting power == 2:
-        ##      autoPilotDodgeMultiplier = 0.5       
-        ## else:
-        ##      autoPilotDodgeMultiplier = 0
+        # ! Once I add AI adjutants, consider them as crew. Rework code below when I implement adjutants.
 
-        ##if self.systems["Piloting"].manned == True:
-        ##    #dodgeFromPiloting = dodgeFromCrewLevel[crew.level]    # OR SOMETHING IDK
-        ##    print("BUG TESTING - You need to double-check evasion bonus from manning pilots & engines")
-        ##else:
-        ##    dodgeFromPiloting = 0
+    # Auto-Ships are always "crewed." Consider piloting to be manned for autoPilotDodge purposes.
+        if self.auto_ship == True:
+            autoPilotDodgeMultiplier = 1
+    # If piloting has a pilot, and it has power, give maximum evasion.
+        elif pilotingRoom.system.manned == True and pilotingRoom.system.power > 0:
+            autoPilotDodgeMultiplier = 1
+    # If you have crew in your piloting, and it has power. Have evasion but no manned bonus.
+        elif len(pilotingRoom.crewInRoom[my_crew]) > 0 and pilotingRoom.system.power > 0:
+            autoPilotDodgeMultiplier = 1
+    # No crew/manning pilot. Engage auto-pilot. 
+        elif len(pilotingRoom.crewInRoom[my_crew]) == 0 and pilotingRoom.system.power >= 2:
+            autoPilotDodgeMultiplier = autoPilotDodgeMultiplier[self.systems["Piloting"].power] 
+    # No crew/manning pilot. No auto-pilot (lvl 2/3 piloting). System damaged.
+        else:
+            autoPilotDodgeMultiplier = 0
 
-        ##if self.systems["Engines"].manned == True:
-        ##    #dodgeFromEngineering = dodgeFromCrewLevel[crew.level]    # OR SOMETHING IDK
-        ##    print("BUG TESTING - You need to double-check evasion bonus from manning pilots & engines")
-        ##else:
-        ##    dodgeFromEngineering = 0
+        # Provide bonuses to evasion from crew manning Piloting and Engineering. Based on skill level.
+        if pilotingRoom.system.manned == True:
+            dodgeFromPiloting = dodgeFromCrewLevel[pilotingRoom.system.mannedCrewMate.experience_skills["Piloting"][0]]
+        else:
+            dodgeFromPiloting = 0            
+        if enginesRoom.system.manned == True:
+            dodgeFromEngineering = dodgeFromCrewLevel[enginesRoom.system.mannedCrewMate.experience_skills["Engines"][0]]
+        else:
+            dodgeFromEngineering = 0
 
-        # Evasion = (Power in engines + crew in Pilots/Engines) * Multiplier from auto-pilot
-        self.evasion = (dodgeFromEngines[self.systems["Engines"].power] + dodgeFromPiloting + dodgeFromEngineering)*autoPilotDodgeMultiplier
+        # Evasion = (Power in engines + crew in Pilots/Engines) * Multiplier from auto-pilot + cloak evasion
+        self.evasion = (dodgeFromEngines[enginesRoom.system.power] + dodgeFromPiloting + dodgeFromEngineering)*autoPilotDodgeMultiplier + cloakEvasion
 
     # Needs more work
     def fireWeapon(self, gun, target):
@@ -109,10 +141,19 @@ class Ship(object):
         
     # Suggestion: Make AI more likely to target high-value systems.
         for shot in range(gun.projectiles):
+            if self.systems["Weapons"].manned == True:
+                target.systems["Weapons"].mannedCrewMate.earnXP("Weapons") 
+
             room_targetted = choice(target.rooms) 
             roll_to_hit = randint(1, 100)
             if target.evasion > roll_to_hit and gun.type != "Beam":     # Beams cannot miss
                 print("-- MISS!")
+                # Crewmembers get XP for dodging
+                if target.systems["Piloting"].manned == True:
+                    target.systems["Piloting"].mannedCrewMate.earnXP("Piloting") 
+                if target.systems["Engines"].manned == True:
+                    target.systems["Engines"].mannedCrewMate.earnXP("Engines") 
+                                
             else:
             ## Now evaluate what happens to the shields ##
                 shieldsPenetrated = False
@@ -133,6 +174,8 @@ class Ship(object):
                         elif gun.type != "Missile" and gun.type != "Bomb": # If not a bomb and missile type, projectile hits shield 
                             target.shields -= 1
                             print("-- Shield hit!")#
+                            if target.systems["Shields"].manned == True:
+                                target.systems["Shields"].mannedCrewMate.earnXP("Shields") 
 
                         else:
                             shieldsPenetrated = True
@@ -145,23 +188,40 @@ class Ship(object):
                 if shieldsPenetrated == True:
                     if room_targetted.system != "Empty": # System damage done, shift power level
                         room_targetted.system.damage += damageDone         
-                        room_targetted.system.determineDamage(target, room_targetted.system)
+                        room_targetted.system.determineDamage()
 
                     for allegiance in room_targetted.crewInRoom:    # Crew damage applied to all crew in room
                         for crew in room_targetted.crewInRoom[allegiance]:
-                            crew.sufferDamage(gun.crew_damage)
+                            crew.sufferDamage(gun.crew_damage, gun)
 
                     roll_to_add_fire = randint(1, 100)
                     roll_to_add_breach = randint(1, 100)
-                    #roll_to_stun = randint(1, 100)
+                    roll_to_stun = randint(1, 100)
+
                     if roll_to_add_fire <= gun.fire_chance: 
-                        room_targetted.startFire("Weapon")
+                        room_targetted.startFire("Weapon", gun.name)
 
                     if roll_to_add_breach <= gun.breach_chance and len(room_targetted.breaches) < room_targetted.size:
                         room_targetted.breaches.append(10)
                         print("-! Hull breached!")
-                    #if roll_to_stun <= gun.stun_chance:
-                    #    pass           
+                    
+                    if roll_to_stun <= gun.stun_chance:
+                        if len(room_targetted.crewInRoom) > 0: # Notification. Could be refined further.
+                            if len(room_targetted.crewInRoom["friendly"]) > 0:
+                                namesFoundFriendly = "  FRIENDLIES: "
+                                for crew in room_targetted.crewInRoom["friendly"]:
+                                    namesFoundFriendly += crew.name + " | "
+                                print(namesFoundFriendly + "have been stunned!")
+                            if len(room_targetted.crewInRoom["hostile"]) > 0:
+                                namesFoundHostile = "  HOSTILES: "
+                                for crew in room_targetted.crewInRoom["hostile"]:
+                                    namesFoundHostile += crew.name + " | "
+                                print(namesFoundHostile + "have been stunned!")
+
+
+                        for allegiance in room_targetted.crewInRoom:
+                            for crew in room_targetted.crewInRoom[allegiance]:
+                                crew.stats["Stun duration"] += gun.stun_duration
 
 
                 if damageDone > 0:
@@ -214,6 +274,7 @@ class Weapon(object):
                 self.breach_chance = 10
             if type == "Missile":
                 self.stun_chance = 20
+                self.stun_duration = 5  # ! Each weapon has different stun duration. E.G. Stun bomb is 15 seconds.
             if type == "Beam":
                 self.beam_length = 2 # ! This needs reworking. 2 Represents a mini-beam length of 2 rooms.
 
@@ -250,25 +311,30 @@ class Room(object):
             "friendly": [],
             "hostile":    []
             }
-        self.fires = [] # List containing health of each fire. # of fires is len of the list.   
-        self.breaches = [] # Ditto
+
+        self.doors = []     # Each door has a level, health, and Open/Closed status 
+        self.breaches = []  # List containing health of each breach. # of breaches is len of the list.  
+        self.fires = []     # Ditto
         self.fireProgress = 0   # Every fire in room increments progress to start another fire in the room
-        self.fireChance = 0    # Random range from 12-18
+        self.fireChance = 0     # Random range from 12-18. A fire will occur when progress matches this chance
+        self.fireJumpChance = 0 # A fire has a chance to spread to a nearby room. fireProgress contributes to this
 
     def __repr__(self):
         return self.system.name
 
 
     # function to add fires
-    def startFire(self, method):
+    def startFire(self, method, perpetuator):
         if len(self.fires) < self.size:         # Max fires = Size of room
             self.fireChance = randint(12, 18)
             self.fires.append(40)
 
             if method == "Weapon":
-                print("-! Fire started from weapon!")
+                print("-! Fire started from a %s shot!" % (perpetuator) )
             elif method == "Spread":
-                print("-! Fire is spreading in room %s!" % (self.system))
+                print("-! Fire is spreading in %s!" % (self.system))
+            elif method == "Jump":
+                print("-! Fire has now jumped to %s!" % () )
 
 
     # function to add breaches
@@ -278,20 +344,23 @@ class Room(object):
 class System(object):
     power = 1               # Amount of power in system
     systemLevel = 2         # Current Upgraded level of System. Can take up to this much power
-    repairProgress = 0      # Repair 1 power bar when >= 10. Crew repairing systems contribute.
-    damageProgress = 0      # Increment 1 damage when >= 10. Hostiles destroying systems & fire contribute. Reset if empty. DONOT reset if fire present.
+    systemPowerMemory = 1   # When systems are damaged/ionized, they'll automatically be re-powered to their intended power
+    repairProgress = 0      # Crew repair progress will restore 1 power bar when >= 10. Reset if room empty of friendlies.
+    damageProgress = 0      # Intruders and fire damage systems. 1 system damage when >= 10. Reset if room empty of hostiles. DONOT reset if fire present.
     damage = 0              # Damage to system prevents power intake to the system.
     ion_damage = 0
+    parentRoom = ""         # System has access to the Room object that it resides in.
 
     def __init__(self, name, startingSystemLevel, maxUpgradeableLevel):
         mannableSystems = ["Piloting", "Shields", "Weapons", "Engines", "Sensors", "Doors"]
 
         self.name = name
-        self.systemLevel = startingSystemLevel
+        self.systemLevel = startingSystemLevel      
         self.maxUpgradeableLevel = maxUpgradeableLevel
 
         if self.name in mannableSystems:
             self.manned = False
+            self.mannedCrewMate = ""
         else:
             self.manned = "Not possible"
 
@@ -299,14 +368,19 @@ class System(object):
     def __repr__(self):
         return self.name
 
-    def determineDamage(self, shipClass, systemBlasted):
-        self.power = self.systemLevel - self.damage - self.ion_damage       # ! Wait... how does ion damage work with actual damage?
-        if self.power < 0:
+    # When a system takes damage, reduce its power by damage. If system is fixed, restore power as necessary.
+    # ! System blasted may be entirely unnecessary  
+    #def determineDamage(self, shipClass, systemBlasted):
+    def determineDamage(self):
+        self.power = self.systemPowerMemory - self.damage - self.ion_damage       # ! Wait... how does ion damage work with actual damage?
+        if self.power < 0:  # Cannot have negative power in a system
             self.power = 0
+        if self.damage > self.systemLevel: # Cannot have more damage in a system than its system level
+            self.damage = self.systemLevel
 
         # Is this necessary at all? I think it can be included in rejuvenate shields
-        if systemBlasted.name == "Shields":
-            shipClass.shields = floor(systemBlasted.power / 2)
+        ## if systemBlasted.name == "Shields":
+        ##     shipClass.shields = floor(systemBlasted.power / 2)
 
         # Rightmost-powered weapon starts charging down at -2 charge/sec
         #if systemBlasted.name == "Weapons": 
@@ -315,29 +389,42 @@ class System(object):
         # etc for other systems
 
     # A system will lose all repair/damage progress if all friendlies/hostiles leave the room before fixing/destroying the system.
+    # Exception - Fires will prevent damage reset because they are actively damaging the system.
     def checkCrewPresence(self, room):
-        if ((len(room.crewInRoom["friendly"]) == 0 and room.parentShip.isPlayer == True) or
-            (len(room.crewInRoom["hostile"]) == 0 and room.parentShip.isPlayer == False) ):
-            room.system.repairProgress = 0
-        if ((len(room.crewInRoom["friendly"]) == 0 and room.parentShip.isPlayer == False) or
-            (len(room.crewInRoom["hostile"]) == 0 and room.parentShip.isPlayer == True) ):
-            room.system.damageProgress = 0
+        if len(room.fires) == 0:
+            if ((len(room.crewInRoom["friendly"]) == 0 and room.parentShip.isPlayer == True) or
+                (len(room.crewInRoom["hostile"]) == 0 and room.parentShip.isPlayer == False) ):
+                room.system.repairProgress = 0
+            if ((len(room.crewInRoom["friendly"]) == 0 and room.parentShip.isPlayer == False) or
+                (len(room.crewInRoom["hostile"]) == 0 and room.parentShip.isPlayer == True) ):
+                room.system.damageProgress = 0
  
 
-
+    # powerUp and powerDown are for when the player manually increases or decreases power in a system
     def powerUp(self):
         if self.power < self.systemLevel:
             self.power += 1
+            self.systemPowerMemory = self.power
         else:
-            print("\nNOTE: System is at maximum power. Cannot power any further!")
+            print("\nNOTE: System is at maximum power. Cannot inject any more power!")
 
     def powerDown(self):  
         if self.power > 0:
             self.power -= 1
+            self.systemPowerMemory = self.power
         else:
             print("\nNOTE: Cannot power down a system at 0 power.")
 
 
+    # ! Big exception! Medbay hacking must not only stop medbay healing, but cause damage
+    # Medbays heal for 1x / 1.5x / 3x depending on level. Healing at lvl 1 is 6.4 hp/sec
+    def medbayHeal(self, crewObject):
+        if self.power > 0:  # Is Medbay powered?
+            # Friendly medbay heals friendly crewmembers; or enemy medbay heals enemies
+            if ( (self.parentRoom.parentShip.isPlayer == True and crewObject.stats["Allegiance"] == "friendly") or 
+                (self.parentRoom.parentShip.isPlayer == False and crewObject.stats["Allegiance"] == "hostile" )):
+                medbayHealingModifier = [0, 1, 1.5, 3]
+                crewObject.stats["Health"] += 6.4 * medbayHealingModifier[self.power]
 
 
 # Types: Ship drone, Boarding drone, attack drone, defense drone
@@ -374,6 +461,7 @@ class Crew(object):
             "maxHealth": 100,
             "Damage": 1,                # Random damage modifier. 0.5 for Engi, 1.5 for Mantis
             "Repair speed": 1,                  # Engi, Mantis, Repair Drone
+            "Stun duration": 0,
             "Movement speed": 1,                # Mantis, Rock, Lanius, Crystal, Drones
             "Fire fighting speed": 4,           # Mantis=0.5 | Crystal=0.83 | Rock=1.67 | Engi=2
             "Suffocation damage": 1,            # Crystal=0.5 | Lanius=0 | Drones=0
@@ -382,11 +470,12 @@ class Crew(object):
         # -- ABILITIES -- # 
             "Zoltan power": False,              # Zoltan
             "Death explosion": False,           # Zoltan
-            "Reveals nearby rooms": False,      # Slug
+            "Telepathy": False,                 # Slug revealing nearby rooms
             "Mind control immunity": False,     # Slug, Drones
             "Fire immunity": False,             # Rock, Drones
             "Drains oxygen": False,             # Lanius
             "Lockdown ability": False           # Crystal
+            #"Regenerates oxygen": False        # AEGIS Drone (from my own ideas)
         }
 
         self.generateCrew(species, shipOnboard) # Set starting stats dependent on species
@@ -447,7 +536,7 @@ class Crew(object):
                     self.destinationIndex = self.locationIndex
                     break
             else:
-                print("ERROR - Could not find a room for %s!" % (self.name))
+                print("DEBUG ERROR - Could not find a room for %s!" % (self.name))
 
 
         elif isPlayer == False:
@@ -495,11 +584,14 @@ class Crew(object):
 
         # Potential bug - what happens when you reach your location with leftover movement?
         #   i.e. Mantis/Mantis pheromones providing that
-        if self.locationIndex == self.destinationIndex: # Announce arrival to destination
+        # I believe the bug has been fixed. Delete comment when confirmed.
+
+        if self.locationIndex == self.destinationIndex: # Notification of arrival to destination
             print(f" [% {self.name} has arrived in {self.location}.")
 
 
     def evaluateTask(self):
+        # Always fight enemy crewmembers. This takes precedence over any other task.
         if ( (self.stats["Allegiance"] == "friendly" and len(self.location.crewInRoom["hostile"]) > 0) or 
             (self.stats["Allegiance"] == "hostile" and len(self.location.crewInRoom["friendly"]) > 0) ):
             self.combatAction()
@@ -531,12 +623,14 @@ class Crew(object):
         #elif needtoreposition
             #print("DEBUGGING - Reposition to man system / fight boarder")
 
-        elif self.location.system.manned == False:
+        # If room can be manned and it's not manned, man it. Only man friendly systems.
+        elif ( self.location.system.manned == False and 
+                (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
+                self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
             self.location.system.manned = True
+            self.location.system.mannedCrewMate = self
 
-
-        else:
-            pass # idle
+        # Else, idle.
 
 
     def combatAction(self):
@@ -563,10 +657,9 @@ class Crew(object):
 
         else:
             combat_target = self.location.crewInRoom[them][self.roomPositionIndex] # Fight in same tile
-            #print("DEBUGGING - I, %s, am fighting this punk called %s!" % (self.name, combat_target.name))
 
         dealingDamage = randint(4, 8) * self.stats["Damage"]
-        combat_target.sufferDamage(dealingDamage)
+        combat_target.sufferDamage(dealingDamage, self)
 
         
 
@@ -575,7 +668,10 @@ class Crew(object):
 
         if self.location.system.damageProgress >= 10: # When system accumulates enough damage, damage a power bar.
             self.location.system.damage += 1
+            self.location.system.determineDamage()
             self.location.system.damageProgress = 0
+
+            self.earnXP("Fighting")
             
             if self.location.system.damage == self.location.system.systemLevel:
                 self.location.parentShip.hull -= 1
@@ -589,6 +685,11 @@ class Crew(object):
 
         if self.location.system.repairProgress >= 10: # When system accumulates enough repair, repair a power bar.
             self.location.system.damage -= 1
+            self.location.system.determineDamage()
+            self.location.system.repairProgress = 0
+
+            # Earn XP
+            self.earnXP("Repairing")
             
             # Fully repaired notification
             if self.location.system.damage == 0 and self.location.parentShip.isPlayer == True: 
@@ -602,7 +703,10 @@ class Crew(object):
         self.location.breaches[0] -= self.stats["Repair speed"] # First breach in list 'loses' health at the rate of repair speed.
 
         if self.location.breaches[0] <= 0: 
-            del self.location.breaches[0]
+            del self.location.breaches[0]   # Breaches don't 'move' tiles. They stay where they are. Change?
+
+            # Earn XP
+            self.earnXP("Repairing")
             
             # All breaches repaired notification
             if len(self.location.breaches) == 0 and self.location.parentShip.isPlayer == True:
@@ -630,15 +734,21 @@ class Crew(object):
 
     # Doing any action will force the crewmember to unman the system, if it is mannable to begin with.
     def unmanSystemAction(self):
-        if self.location.system.manned != "Not possible":
+        if self.location.system.manned != "Not possible" and self.location.system.manned == True:
             self.location.system.manned = False
+            self.location.system.mannedCrewMate = ""
 
-    def sufferDamage(self, damage):
+    # Crewmember takes damage. They die, and are deleted, when health reaches 0.
+    def sufferDamage(self, damage, source):
         self.stats["Health"] -= damage
         #print("DEBUGGING - %s has taken %d damage. Health now: %d" % (self.name, damage, self.stats["Health"]) )
         if self.stats["Health"] <= 0:
             if self.stats["Allegiance"] == "friendly":
                 print("!! [%s | %s] has died!" % (self.name, self.species) )
+
+            # If source of death was from crew combat, killer gains XP.
+            if isinstance(source, Crew):
+                source.earnXP("Fighting")
 
             for i, person in enumerate(self.shipOnboard.crew):
                 if person.name == self.name:
@@ -651,6 +761,17 @@ class Crew(object):
             del self
 
 
+    def earnXP(self, whatSkill):
+        if self.experience_skills[whatSkill][0] < 2:    # Do not earn XP if max level already
+            self.experience_skills[whatSkill][1] += 1
+            print("DEBUGGING - %s has earned XP toward %s." % (self.name, whatSkill) )
+            if self.experience_skills[whatSkill][1] >= self.experience_skills[whatSkill][2]:
+                self.experience_skills[whatSkill][0] += 1
+                self.experience_skills[whatSkill][1] = 0
+                print(" [+ %s has leveled up in %s!" % (self.name, whatSkill) )
 
-
-    #def earnXP(self)
+                if whatSkill == "Fighting":
+                    self.stats["Damage"] += 0.1
+                elif whatSkill == "Repairing":
+                    self.stats["Repair speed"] += 0.1
+                    self.stats["Fire fighting speed"] += 0.1
