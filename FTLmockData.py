@@ -7,11 +7,14 @@ weaponsDatabase = { "Basic Laser": ["Laser",1,10,1,1,20],  "Burst Laser Mk II": 
                     "Ion Blast": ["Ion",1,8,1,1,10]
                 }
 
-# Maybe be startingGear, with weapons, drones, systems, systemsStartingLevel, crew, augmentations, maxWeapons and maxDrones...
+# [Weapons], [Drones], [Systems], [SystemsStartingLevel], [crew], [augmentations], 
+# [Fuel/Missile/Drones/Reactor], maxWeapons and maxDrones...
 startingGear = {
+    # -- PLAYER SHIPS -- #
     "Kestral": [ ["Burst Laser Mk II", "Artemis"], [""], ["Shields","Engines","Weapons","Oxygen",
                     "Medbay","Doors","Sensors","Piloting"], [2, 2, 3, 1, 1, 1, 1, 1], 
-                    ["Human", "Human", "Human"], [], 4, 2],
+                    ["Human", "Human", "Human"], [], [16, 12, 0, 8], 4, 2],
+    # -- ENEMY SHIPS -- #
     "Rebel Fighter": [ ["Basic Laser", "Artemis"], [""], ["Shields","Engines","Weapons","Oxygen",
                     "Medbay","Piloting"], [2, 2, 3, 1, 1, 1], 
                     ["Human", "Human", "Human"], [], 4, 2],
@@ -40,10 +43,12 @@ systemsDatabase = {
 # Database of Weapon objects in FTL (converted to Tuple later). Info imported from ..Data.py weaponsDatabase  
 weaponsCollection = []
 
-systemsCollection = ("Piloting", "Engines", "Weapons", "Shields", "Oxygen", "Medbay", "Clone Bay", "Drone Control",
-                "Backup Battery", "Doors", "Sensors", "Hacking", "Mind Control", "Cloaking", "Teleporter")
+#systemsCollection = ("Piloting", "Engines", "Weapons", "Shields", "Oxygen", "Medbay", "Clone Bay", "Drone Control",
+#                "Backup Battery", "Doors", "Sensors", "Hacking", "Mind Control", "Cloaking", "Teleporter")
 
-encounterShipsCollection = ("Slug Interceptor", "Auto Scout", "Auto Assault", "Rebel Fighter")
+encounterShipsCollection = ("Slug Interceptor", "Auto-Scout", "Auto-Assault", "Rebel Fighter")
+
+enemyAutoShips = ("Auto-Scout", "Auto-Assault")
 
 playableShipsCollection = ("Kestral", "Nissan", "Osprey", "Red-Tail") # Fill this up later
 

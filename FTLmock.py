@@ -11,11 +11,18 @@
 #   Fire needs to spreading mechanics
 #   The whole oxygen system
 #   Opening vents
-#   Fire needs to damage
 #   Drones
+#   System effects.
+#   Weapons depowering when they suffer damage.
+#   Weapon recharge speed modifiers from crew/augments. Shield recharge speed from crew.
+#   Door system
+#   Proper randomized enemy loadouts. They're pre-set.
 
 # UNTESTED FEATURES
-# XP
+#   
+
+# CURRENT BUGS.
+# Fired at enemy ship's weapons. Enemy crewmember on MY SHIP got stunned. huh?
 
 
 import time
@@ -34,12 +41,13 @@ for gun in weaponsDatabase:
 weaponsCollection = tuple(weaponsCollection) # Solidify list by turning into tuple
 
 
-
-def grantStartingGear(shipClass, startingGear, weaponsDatabase):
+#def grantStartingGear(shipClass, startingGear):
+def grantStartingGear(shipClass):
     for selectShip in startingGear:
         if selectShip == shipClass.name:
         
         ### Get Weapons ###
+        # Enemies should get randomized weapons
             for desire in startingGear[selectShip][0]: 
                 for gun in weaponsCollection:                   
                     if desire == gun.name:                      
@@ -47,6 +55,7 @@ def grantStartingGear(shipClass, startingGear, weaponsDatabase):
                         continue
 
         ### Get Rooms ###
+        # Enemies should have randomized systems
             for X in roomsDatabase[shipClass.name]:    # Similar logic as weapons loop above this
                 if X[1] != "Empty":                  # Whilst we're at it, add systems in rooms to the systems list
                     sysName = X[1]
@@ -59,8 +68,11 @@ def grantStartingGear(shipClass, startingGear, weaponsDatabase):
 
                 newRoom = Room(X[0], addNewSystem, X[2], shipClass)     # The room's Size, SystemClass, Vents, and ship its a part of 
                 shipClass.rooms.append(newRoom)
+                if X[1] != "Empty":
+                    shipClass.systems[X[1]].parentRoom = newRoom        # Give the newly created system an attribute to access its room
 
         ### Set starting levels of systems ###
+        # TO Starting levels need to be dependent on sector difficulty.
             sysData = zip(startingGear[selectShip][2], startingGear[selectShip][3])
             for x in sysData:
                 sysName = x[0]
@@ -68,13 +80,41 @@ def grantStartingGear(shipClass, startingGear, weaponsDatabase):
 
                 shipClass.systems[sysName].systemLevel = sysStartingLevel # Set system level from ship database
                 shipClass.systems[sysName].power = sysStartingLevel # Automatically give that system maximum power
-                #print("System name: %s | System level: %d | Power: %d" % (sysName, shipClass.systems[sysName].systemLevel, shipClass.systems[sysName].power) )
+                shipClass.systems[sysName].systemPowerMemory = shipClass.systems[sysName].power # Preferred power
+
+        ### Get doors for rooms ###
+            for room in shipClass.rooms:
+                if "Doors" in shipClass.systems:    # If ship has door subsystem
+                    doorLevel = shipClass.systems["Doors"].systemLevel
+                    for x in range(2):
+                        room.doors.append([ doorLevel , 10*doorLevel, "Closed" ])
+                else:                               # Otherwise, level 1 doors
+                    for x in range(2):
+                        room.doors.append([ 1 , 10, False ])
+
 
         ### Get Drones ###
 
         ### Get crew ####
             for person in startingGear[selectShip][4]:
                 Crew(person, shipClass, crewNameDatabase)
+
+        ### Get fuel, missiles, drones, reactor ###
+        # ! Is it really only for player? I think enemies deserve it
+            if shipClass.name in playableShipsCollection:
+                FUEL = startingGear[selectShip][6][0]
+                shipClass.missiles = startingGear[selectShip][6][1]
+                shipClass.drone_parts = startingGear[selectShip][6][2]
+                shipClass.reactor = startingGear[selectShip][6][3]
+
+        # Is enemy ship an auto ship? Give it its property.
+            if shipClass.name in enemyAutoShips:
+                shipClass.auto_ship = True
+            
+        # If the ship doesn't come with an oxygen system, all rooms will have 0 oxygen.
+            if "Oxygen" not in shipClass.systems:
+                for room in shipClass.rooms:
+                    room.oxygen = 0
         
         else:
             continue
@@ -95,13 +135,24 @@ def otherShip(whoAreWe):
 
 
 def checkWeaponStatus(shipClass):
+    if shipClass.systems["Weapons"].manned == True:
+        crewMateSkillList = [0.10, 0.15, 0.20]
+        crewMateBonus = crewMateSkillList[shipClass.systems["Weapons"].mannedCrewMate.experience_skills["Weapons"][0]]
+    else:
+        crewMateBonus = 0
+
+    # ! Add Weapon Recharger augments here for -15% Charge time
+    otherModifiers = 0 
+
     for index, gun in enumerate(shipClass.weapons.values() ):
-        if gun.charge >= gun.cooldown and gun.autoFire == True:
+        timeToCharge = gun.cooldown * (1 - crewMateBonus - otherModifiers) 
+
+        if gun.charge >= timeToCharge and gun.autoFire == True:
             shipClass.fireWeapon(gun, otherShip(shipClass) )
-        elif gun.charge >= gun.cooldown and gun.autoFire == False:
+        elif gun.charge >= timeToCharge and gun.autoFire == False:
             #print("#%d [%s] %s - READY" % (index+1, "I"*gun.powerNeeded, gun) )
             pass
-        elif gun.charge < gun.cooldown:
+        elif gun.charge < timeToCharge:
             #print("#%d [%s] %s - %ds remaining..." % (index+1, "I"*gun.powerNeeded, gun, (gun.cooldown-gun.charge)) )
             pass
 
@@ -118,8 +169,8 @@ playerShip = Ship("Kestral", playableShipsCollection)
 enemyShip = Ship("Rebel Fighter", playableShipsCollection)
 
 
-grantStartingGear(playerShip, startingGear, weaponsCollection)
-grantStartingGear(enemyShip, startingGear, weaponsCollection)       
+grantStartingGear(playerShip)
+grantStartingGear(enemyShip)       
 
 #Testing scenario where all enemy crew board our ship in weapons
 #! This is a useful, basic template for the Teleporter
@@ -146,7 +197,10 @@ for boarder in enemyShip.crew:
     print("%s %s is in %s, onboard the %s." % (boarder.stats["Allegiance"], boarder.name, boarder.location, boarder.shipOnboard))
 
 
-playerShip.crew[0].destinationIndex = 3    # First crewmember goes to Kestrel's 4th room (weapons)
+playerShip.crew[0].destinationIndex = 1    # First crewmember goes to Kestrel's 2nd room (Engines)
+playerShip.crew[1].destinationIndex = 4    # Second crewmember goes to Kestrel's 5th room (Shields)
+playerShip.systems["Medbay"].parentRoom.fires.append(40)    # Add a testing fire to see if it does damage
+
 
 ##### Start of combat touch-up ######
 combatants = [playerShip, enemyShip]
@@ -162,7 +216,8 @@ while enemyShip.destroyed == False:
         if "Shields" in thisPlayer.systems:
             thisPlayer.rejuvenateShield(thisPlayer.systems["Shields"])
 
-        thisPlayer.checkEvasion() # Double check if evasion has changed
+        # Double check if evasion has changed
+        thisPlayer.checkEvasion(thisPlayer.systems["Piloting"].parentRoom, thisPlayer.systems["Engines"].parentRoom) 
         
         for gun in thisPlayer.weapons.values(): # All weapons not ready will charge up 1 second
             if gun.charge < gun.cooldown:
@@ -174,23 +229,42 @@ while enemyShip.destroyed == False:
             if room.system != "Empty":
                 room.system.checkCrewPresence(room)
 
-        for crewMember in thisPlayer.crew: # All crewmembers move 1 step closer to their destination
-            # if stunned, skip this second and count down stun duration
-            #
-            if crewMember.locationIndex != crewMember.destinationIndex:
-                crewMember.moveAction()
-            else:
-                crewMember.evaluateTask()
+        for crewMember in thisPlayer.crew: 
+            if crewMember.location.system.name == "Medbay": # Crew always heal if in medbay
+                crewMember.location.system.medbayHeal(crewMember)
+            if crewMember.location.oxygen <= 5:             # Crew suffocate from low oxygen
+                crewMember.sufferDamage(6.4 * crewMember.stats["Suffocation damage"], "Suffocation")
 
-        # ! Oxygen depletion not yet implemented
+            # Crew members do not take actions when stunned. Count down stun duration and skip this second.
+            if crewMember.stats["Stun duration"] > 0:
+                crewMember.stats["Stun duration"] -= 1
+            else:
+                if crewMember.locationIndex != crewMember.destinationIndex: # All crewmembers move 1 step closer to their destination
+                    crewMember.moveAction()
+                else:
+                    crewMember.evaluateTask()   # If not moving, determine what task to do. Examine this function for details.
+
+        # ! Venting rooms of oxygen not implemented
+        # ! Oxygen flowing to rooms with less oxygen not implemented
+        if "Oxygen" in thisPlayer.systems:
+            if thisPlayer.systems["Oxygen"].power == 0:
+                for room in thisPlayer.rooms:
+                    room.oxygen -= 1.2
+
+            else:
+                oxygenRegenerationRateModifier = [0, 1, 2, 3]
+                for room in thisPlayer.rooms:
+                    room.oxygen += 1.2 * oxygenRegenerationRateModifier[thisPlayer.systems["Oxygen"].power]
+
         # Fire suppression augment should extinguish fires in this section of code.
         for room in thisPlayer.rooms:
             if len(room.fires) > 0:
-                if room.system != "Empty":  # System takes damage from fire
+                if room.system != "Empty" and room.system.damage < room.system.systemLevel:  # System takes damage from fire
                     room.system.damageProgress += 0.75 * len(room.fires)
 
                     if room.system.damageProgress >= 10: # When system accumulates enough damage, damage a power bar.
                         room.system.damage += 1
+                        room.system.determineDamage()
                         room.system.damageProgress = 0
 
                         if room.system.damage == room.system.systemLevel:
@@ -200,35 +274,65 @@ while enemyShip.destroyed == False:
                 for allegiance in room.crewInRoom:  # All crew in room take fire damage
                     for crew in room.crewInRoom[allegiance]:
                         if crew.stats["Fire immunity"] == False:
-                            crew.sufferDamage(5 * len(room.fires)) # 5 dmg per fire / second
+                            crew.sufferDamage(3 * len(room.fires), "Fire") # 3 dmg per fire / second
 
-                # Deplete oxygen
+                # Fires consume oxygen
+                room.oxygen -= 1.2 * len(room.fires)
+
+                # No oxygen will lead to fires getting extinguished
+                if room.oxygen <= 5:
+                    for fire in room.fires:
+                        fire -= 10
 
                 # Fire spreads in room.
-                # ! Needs functionality to spread to other rooms
+                room.fireJumpChance += len(room.fires)
                 room.fireProgress += len(room.fires)
                 if room.fireProgress >= room.fireChance:
-                    room.startFire("Spread")
+                    room.startFire("Spread", "Something")
+
+                # Fire has a random % chance to spread to nearby room.
+                # rollToSpreadFire = randint(0, 100)
+                # if rollToSpreadFire < room.fireJumpChance:
+                #     oddsForEachRoom = [100/len(room.doors)] * len(room.doors)
+                    
+                #     for checkingDoorIndex, doorStats in enumerate(room.doors):
+                #         if doorStats[-1] == "Open":
 
 
 
-    if otherShip(playerShip).destroyed == True: # You won the fight
-        print("\n%s has been destroyed! Well done. Precluding combat." % otherShip(playerShip) )
+                    #for door in room.doors:
+                    #    oddsForEachRoom.append(50)
+
+                    # Since it's a 2d map from left to right only, rooms to left & right have a 50/50 chance of 'catching' the fire.
+                    # If door is open for any reason, that room has a 80% of 'catching' the fire.
+                    # If doors on both sides are open, revert back to 50/50. Chances are reduced by level of doors.
+                    pass
+
+                
+
+
+
+    if enemyShip.destroyed == True: # You won the fight
+        print("\n%s has been destroyed! Well done. Precluding combat." % (enemyShip.name) )
         # Earn rewards
-        break
-    elif otherShip(enemyShip).destroyed == True: # You lose
-        print("\nThe %s has been annihilated... We have failed our mission. Game over." % otherShip(enemyShip) )
+    elif len(enemyShip.crew) == 0:
+        print("\nAll enemy crew aboard %s have died! Precluding combat." % (enemyShip.name) )
+        # Earn extra rewards for fully looting ship        
+    elif playerShip.destroyed == True: # You lose
+        print("\nThe %s has been annihilated... We have failed our mission. Game over." % (playerShip.name) )
         # Game over will occur
-        break
+    # GameOver does occur if clone bay has people reviving in them!
+    elif len(playerShip.crew) == 0:
+        print("\nValiant crew of %s have all fallen... Our ship has been pilfered for unknowable means. Game over." % (playerShip.name) )
+        # Game over will occur
 
-
-    time.sleep(0.01)
+    #time.sleep(0.01)
 
 
 # print("\n ---------- A.A.R. ----------")
-print(f"Combat has finished after {SECONDS} seconds." )
-# for room in enemyShip.rooms:
-#     print("Room: %s | Fires: %d | Breaches: %d" % (room.system, len(room.fires), len(room.breaches)) )
+# print(f"Combat has finished after {SECONDS} seconds." )
+# for crew in playerShip.crew:
+#     print("Name: %s | Stun duration: %s" % (crew.name, crew.stats["Stun duration"] ) )
 
 # for room in enemyShip.rooms:
 #     if room.system != "Empty":
