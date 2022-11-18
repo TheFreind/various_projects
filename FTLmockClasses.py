@@ -15,6 +15,8 @@
 from random import randint, choice
 from math import floor
 
+secondsInterval = 0.1   # Game progresses at 0.1 second at a time.
+
 class Ship(object):
     destroyed = False
     auto_ship = False
@@ -25,13 +27,14 @@ class Ship(object):
     shield_recharge_speed = 3 # Determined by manning crew, etc. Constant set to 3 seconds for now.
     evasion = 0
     oxygen = 100
+    clone_bay_queue = []
 
     # Might need to add "rooms" parameter
     def __init__(self, name, playableShipsCollection):
         self.name = name
         
 
-        self.weapons = {}
+        self.weapons = []
         self.systems = {}
         self.crew = []
         self.augments = []
@@ -80,7 +83,7 @@ class Ship(object):
         if shieldClass.power >= 2:
             
             if (self.shield_recharge_progress < timeNeeded and self.shields < floor(shieldClass.power / 2) ): 
-                self.shield_recharge_progress += 1
+                self.shield_recharge_progress += secondsInterval
 
             elif self.shields < floor(shieldClass.power / 2): 
                 self.shields += 1
@@ -134,107 +137,108 @@ class Ship(object):
         self.evasion = (dodgeFromEngines[enginesRoom.system.power] + dodgeFromPiloting + dodgeFromEngineering)*autoPilotDodgeMultiplier + cloakEvasion
 
     # Needs more work
-    def fireWeapon(self, gun, target):
-        print(f'{gun} is firing at {target}!')
-        # Choose room, hit shields, miss shots, damage system, damage crew, etc...
-        # Enter targetting room. This here is just random room selection.
+    # def fireWeapon(self, gun, target):
+    #     print(f"\n{gun} is firing at {target}!")
+    #     # Choose room, hit shields, miss shots, damage system, damage crew, etc...
+    #     # Enter targetting room. This here is just random room selection.
+
+    #     if self.systems["Weapons"].manned == True:
+    #         self.systems["Weapons"].mannedCrewMate.earnXP("Weapons") 
         
-    # Suggestion: Make AI more likely to target high-value systems.
-        for shot in range(gun.projectiles):
-            if self.systems["Weapons"].manned == True:
-                target.systems["Weapons"].mannedCrewMate.earnXP("Weapons") 
+    # # Suggestion: Make AI more likely to target high-value systems.
+    #     for shot in range(gun.projectiles):
 
-            room_targetted = choice(target.rooms) 
-            roll_to_hit = randint(1, 100)
-            if target.evasion > roll_to_hit and gun.type != "Beam":     # Beams cannot miss
-                print("-- MISS!")
-                # Crewmembers get XP for dodging
-                if target.systems["Piloting"].manned == True:
-                    target.systems["Piloting"].mannedCrewMate.earnXP("Piloting") 
-                if target.systems["Engines"].manned == True:
-                    target.systems["Engines"].mannedCrewMate.earnXP("Engines") 
+    #         room_targetted = choice(target.rooms) 
+    #         roll_to_hit = randint(1, 100)
+    #         if target.evasion > roll_to_hit and gun.type != "Beam":     # Beams cannot miss
+    #             print("-- MISS!")
+    #             # Crewmembers get XP for dodging
+    #             if target.systems["Piloting"].manned == True:
+    #                 target.systems["Piloting"].mannedCrewMate.earnXP("Piloting") 
+    #             if target.systems["Engines"].manned == True:
+    #                 target.systems["Engines"].mannedCrewMate.earnXP("Engines") 
                                 
-            else:
-            ## Now evaluate what happens to the shields ##
-                shieldsPenetrated = False
-                damageDone = 0
-                #print("Gun type:", gun.type)
-                #print("Target shields:", target.shields)
+    #         else:
+    #         ## Now evaluate what happens to the shields ##
+    #             shieldsPenetrated = False
+    #             damageDone = 0
+    #             #print("Gun type:", gun.type)
+    #             #print("Target shields:", target.shields)
 
-                if gun.type == "Beam":
-                    if (gun.damage - target.shields) * gun.beam_length > 0:
-                        shieldsPenetrated = True
-                    damageDone = (gun.damage - target.shields) * gun.beam_length
-                else:
-                    if target.shields > 0:
-                        if gun.type == "Ion":
-                            # Add ion damage to shields system
-                            pass#
+    #             if gun.type == "Beam":
+    #                 if (gun.damage - target.shields) * gun.beam_length > 0:
+    #                     shieldsPenetrated = True
+    #                 damageDone = (gun.damage - target.shields) * gun.beam_length
+    #             else:
+    #                 if target.shields > 0:
+    #                     if gun.type == "Ion":
+    #                         # Add ion damage to shields system
+    #                         pass#
 
-                        elif gun.type != "Missile" and gun.type != "Bomb": # If not a bomb and missile type, projectile hits shield 
-                            target.shields -= 1
-                            print("-- Shield hit!")#
-                            if target.systems["Shields"].manned == True:
-                                target.systems["Shields"].mannedCrewMate.earnXP("Shields") 
+    #                     elif gun.type != "Missile" and gun.type != "Bomb": # If not a bomb and missile type, projectile hits shield 
+    #                         target.shields -= 1
+    #                         print("-- Shield hit!")#
+    #                         if target.systems["Shields"].manned == True:
+    #                             target.systems["Shields"].mannedCrewMate.earnXP("Shields") 
 
-                        else:
-                            shieldsPenetrated = True
-                            damageDone = gun.damage
+    #                     else:
+    #                         shieldsPenetrated = True
+    #                         damageDone = gun.damage
 
-                    elif target.shields == 0:
-                        shieldsPenetrated = True
-                        damageDone = gun.damage
+    #                 elif target.shields == 0:
+    #                     shieldsPenetrated = True
+    #                     damageDone = gun.damage
 
-                if shieldsPenetrated == True:
-                    if room_targetted.system != "Empty": # System damage done, shift power level
-                        room_targetted.system.damage += damageDone         
-                        room_targetted.system.determineDamage()
+    #             if shieldsPenetrated == True:
+    #                 if room_targetted.system != "Empty": # System damage done, shift power level
+    #                     room_targetted.system.damage += damageDone         
+    #                     room_targetted.system.determineDamage()
 
-                    for allegiance in room_targetted.crewInRoom:    # Crew damage applied to all crew in room
-                        for crew in room_targetted.crewInRoom[allegiance]:
-                            crew.sufferDamage(gun.crew_damage, gun)
+    #                 for allegiance in room_targetted.crewInRoom:    # Crew damage applied to all crew in room
+    #                     for crew in room_targetted.crewInRoom[allegiance]:
+    #                         crew.sufferDamage(gun.crew_damage, gun)
 
-                    roll_to_add_fire = randint(1, 100)
-                    roll_to_add_breach = randint(1, 100)
-                    roll_to_stun = randint(1, 100)
+    #                 roll_to_add_fire = randint(1, 100)
+    #                 roll_to_add_breach = randint(1, 100)
+    #                 roll_to_stun = randint(1, 100)
 
-                    if roll_to_add_fire <= gun.fire_chance: 
-                        room_targetted.startFire("Weapon", gun.name)
+    #                 if roll_to_add_fire <= gun.fire_chance: 
+    #                     room_targetted.startFire("Weapon", gun.name)
 
-                    if roll_to_add_breach <= gun.breach_chance and len(room_targetted.breaches) < room_targetted.size:
-                        room_targetted.breaches.append(10)
-                        print("-! Hull breached!")
+    #                 if roll_to_add_breach <= gun.breach_chance and len(room_targetted.breaches) < room_targetted.size:
+    #                     room_targetted.breaches.append(10)
+    #                     print("-! Hull breached!")
                     
-                    if roll_to_stun <= gun.stun_chance:
-                        if len(room_targetted.crewInRoom) > 0: # Notification. Could be refined further.
-                            if len(room_targetted.crewInRoom["friendly"]) > 0:
-                                namesFoundFriendly = "  FRIENDLIES: "
-                                for crew in room_targetted.crewInRoom["friendly"]:
-                                    namesFoundFriendly += crew.name + " | "
-                                print(namesFoundFriendly + "have been stunned!")
-                            if len(room_targetted.crewInRoom["hostile"]) > 0:
-                                namesFoundHostile = "  HOSTILES: "
-                                for crew in room_targetted.crewInRoom["hostile"]:
-                                    namesFoundHostile += crew.name + " | "
-                                print(namesFoundHostile + "have been stunned!")
+    #                 if roll_to_stun <= gun.stun_chance:
+    #                     if len(room_targetted.crewInRoom) > 0: # Notification. Could be refined further.
+    #                         if len(room_targetted.crewInRoom["friendly"]) > 0:
+    #                             namesFoundFriendly = "  FRIENDLIES: "
+    #                             for crew in room_targetted.crewInRoom["friendly"]:
+    #                                 namesFoundFriendly += crew.name + " | "
+    #                             print(namesFoundFriendly + "have been stunned!")
+    #                         if len(room_targetted.crewInRoom["hostile"]) > 0:
+    #                             namesFoundHostile = "  HOSTILES: "
+    #                             for crew in room_targetted.crewInRoom["hostile"]:
+    #                                 namesFoundHostile += crew.name + " | "
+    #                             print(namesFoundHostile + "have been stunned!")
 
 
-                        for allegiance in room_targetted.crewInRoom:
-                            for crew in room_targetted.crewInRoom[allegiance]:
-                                crew.stats["Stun duration"] += gun.stun_duration
+    #                     for allegiance in room_targetted.crewInRoom:
+    #                         for crew in room_targetted.crewInRoom[allegiance]:
+    #                             crew.stats["Stun duration"] += gun.stun_duration
 
 
-                if damageDone > 0:
-                    target.hull -= damageDone
-                    print(f"-- Target room: {room_targetted.system} | {target}'s Hull: {target.hull}") # Debugging
+    #             if damageDone > 0:
+    #                 target.hull -= damageDone
+    #                 print(f"-- Target room: {room_targetted.system} | {target}'s Hull: {target.hull}") # Debugging
 
-                if target.hull <= 0:
-                    target.destroyed = True
+    #             if target.hull <= 0:
+    #                 target.destroyed = True
 
 
-        gun.charge = 0
-        if gun.type == "Missile" or gun.type == "Bomb":
-            self.missiles -= 1
+    #     gun.charge = 0
+    #     if gun.type == "Missile" or gun.type == "Bomb":
+    #         self.missiles -= 1
 
 
 
@@ -243,26 +247,26 @@ class Ship(object):
 
 # Types - Laser, Flak, Missile, Bomb, Beam, Ion
 class Weapon(object):
-    charge = 0
-    
-    ion_damage = 0
-    fire_chance = 0    # Chances are in %
-    breach_chance = 0
-    stun_chance = 0
-    beam_length = 0
 
-    autoFire = True    # When enemy AI cloaks, it deactivates autoFire and reenables when exiting cloak
-
-    # Name of weapon, type determines rules it follows, # of damage it does, # of seconds before firing, # of projectiles, cost at shop.
-    def __init__(self, name, type, damage, cooldown, projectiles, powerNeeded, shopCost):
+    def __init__(self, ship, name, type, damage, cooldown, projectiles, powerNeeded, shopCost):
+        self.parentShip = ship
         self.name = name    
         self.type = type
         self.damage = damage
         self.cooldown = cooldown
+        self.charge = 0
         self.projectiles = projectiles
         self.powerNeeded = powerNeeded
         self.shopCost = shopCost
-        # set to Auto or Manual firing?
+        
+        self.ion_damage = 0      # Chances are in %
+        self.fire_chance = 0    
+        self.breach_chance = 0
+        self.stun_chance = 0
+        self.beam_length = 0
+
+        self.autoFire = True    # When enemy AI cloaks, it deactivates autoFire and reenables when exiting cloak
+        self.powered = True 
 
         if type == "Laser" or type == "Beam" or type == "Missile" or type == "Flak":     # Normal damage + system damage
             self.system_damage = self.damage
@@ -295,6 +299,110 @@ class Weapon(object):
 
     def __repr__(self):
         return self.name
+
+    # -- target is the enemyShip object.
+    def fireWeapon(self, target):
+        print(f"\n{self} is firing at {target}!")
+        # Choose room, hit shields, miss shots, damage system, damage crew, etc...
+        # Enter targetting room. This here is just random room selection.
+
+        if self.parentShip.systems["Weapons"].manned == True:
+            self.parentShip.systems["Weapons"].mannedCrewMate.earnXP("Weapons") 
+        
+    # Suggestion: Make AI more likely to target high-value systems.
+        for shot in range(self.projectiles):
+
+            room_targetted = choice(target.rooms) 
+            roll_to_hit = randint(1, 100)
+            if target.evasion > roll_to_hit and self.type != "Beam":     # Beams cannot miss
+                print("-- MISS!")
+                # Crewmembers get XP for dodging
+                if target.systems["Piloting"].manned == True:
+                    target.systems["Piloting"].mannedCrewMate.earnXP("Piloting") 
+                if target.systems["Engines"].manned == True:
+                    target.systems["Engines"].mannedCrewMate.earnXP("Engines") 
+                                
+            else:
+            ## Now evaluate what happens to the shields ##
+                shieldsPenetrated = False
+                damageDone = 0
+                #print("Gun type:", gun.type)
+                #print("Target shields:", target.shields)
+
+                if self.type == "Beam":
+                    if (self.damage - target.shields) * self.beam_length > 0:
+                        shieldsPenetrated = True
+                    damageDone = (self.damage - target.shields) * self.beam_length
+                else:
+                    if target.shields > 0:
+                        if self.type == "Ion":
+                            # Add ion damage to shields system
+                            pass#
+
+                        elif self.type != "Missile" and self.type != "Bomb": # If not a bomb and missile type, projectile hits shield 
+                            target.shields -= 1
+                            print("-- Shield hit!")#
+                            if target.systems["Shields"].manned == True:
+                                target.systems["Shields"].mannedCrewMate.earnXP("Shields") 
+
+                        else:
+                            shieldsPenetrated = True
+                            damageDone = self.damage
+
+                    elif target.shields == 0:
+                        shieldsPenetrated = True
+                        damageDone = self.damage
+
+                if shieldsPenetrated == True:
+                    if room_targetted.system != "Empty": # System damage done, shift power level
+                        room_targetted.system.damage += damageDone         
+                        room_targetted.system.determineDamage()
+
+                    for allegiance in room_targetted.crewInRoom:    # Crew damage applied to all crew in room
+                        for crew in room_targetted.crewInRoom[allegiance]:
+                            crew.sufferDamage(self.crew_damage, self)
+
+                    roll_to_add_fire = randint(1, 100)
+                    roll_to_add_breach = randint(1, 100)
+                    roll_to_stun = randint(1, 100)
+
+                    if roll_to_add_fire <= self.fire_chance: 
+                        room_targetted.startFire("Weapon", self.name)
+
+                    if roll_to_add_breach <= self.breach_chance and len(room_targetted.breaches) < room_targetted.size:
+                        room_targetted.breaches.append(10)
+                        print("-! Hull breached!")
+                    
+                    if roll_to_stun <= self.stun_chance:
+                        if len(room_targetted.crewInRoom) > 0: # Notification. Could be refined further.
+                            if len(room_targetted.crewInRoom["friendly"]) > 0:
+                                namesFoundFriendly = "  FRIENDLIES: "
+                                for crew in room_targetted.crewInRoom["friendly"]:
+                                    namesFoundFriendly += crew.name + " | "
+                                print(namesFoundFriendly + "have been stunned!")
+                            if len(room_targetted.crewInRoom["hostile"]) > 0:
+                                namesFoundHostile = "  HOSTILES: "
+                                for crew in room_targetted.crewInRoom["hostile"]:
+                                    namesFoundHostile += crew.name + " | "
+                                print(namesFoundHostile + "have been stunned!")
+
+
+                        for allegiance in room_targetted.crewInRoom:
+                            for crew in room_targetted.crewInRoom[allegiance]:
+                                crew.stats["Stun duration"] += self.stun_duration
+
+
+                if damageDone > 0:
+                    target.hull -= damageDone
+                    print(f"-- Target room: {room_targetted.system} | {target}'s Hull: {target.hull}") # Debugging
+
+                if target.hull <= 0:
+                    target.destroyed = True
+
+
+        self.charge = 0
+        if self.type == "Missile" or self.type == "Bomb":
+            self.parentShip.missiles -= 1
 
 
 # Each room should have spaces for people, # of vents, breaches, fire, o2 in the room, and a system.
@@ -382,9 +490,26 @@ class System(object):
         ## if systemBlasted.name == "Shields":
         ##     shipClass.shields = floor(systemBlasted.power / 2)
 
-        # Rightmost-powered weapon starts charging down at -2 charge/sec
-        #if systemBlasted.name == "Weapons": 
-        #    pass 
+        # ! Copy paste this segment of code for Drones.
+        # If weapons are damaged, check if any weapons get de-powered
+        if self.name == "Weapons": 
+
+            powerToSpare = self.power   # Check if power in Weapons is enough for each gun
+            finalPower = []             # Remember how much power we are using from each gun
+
+            for gun in self.parentRoom.parentShip.weapons:
+                if powerToSpare >= gun.powerNeeded:
+                    powerToSpare -= gun.powerNeeded
+                    gun.powered = True
+                    finalPower.append(gun.powerNeeded)
+
+                else:
+                    gun.powered = False
+                    finalPower.append(0)
+
+            finalPower = sum(finalPower)
+            self.power = finalPower     
+            # In the end, the Weapons system automatically depowers unaffordable guns and refunds Reactor power
 
         # etc for other systems
 
@@ -424,7 +549,7 @@ class System(object):
             if ( (self.parentRoom.parentShip.isPlayer == True and crewObject.stats["Allegiance"] == "friendly") or 
                 (self.parentRoom.parentShip.isPlayer == False and crewObject.stats["Allegiance"] == "hostile" )):
                 medbayHealingModifier = [0, 1, 1.5, 3]
-                crewObject.stats["Health"] += 6.4 * medbayHealingModifier[self.power]
+                crewObject.stats["Health"] += 6.4 * medbayHealingModifier[self.power] * secondsInterval
 
 
 # Types: Ship drone, Boarding drone, attack drone, defense drone
@@ -437,9 +562,11 @@ class Drone(object):
         self.type = type
 
 class Crew(object):
-    # Variables defined in __init__ --> [self.name, self.species, self.location, self.locationIndex, self.destinationIndex]
+    # Other Variables defined in __init__ --> [self.name, self.species, self.location, self.locationIndex, self.destinationIndex]
     movementProgress = 0
-    combat_target_cycle = 0  # If not brawling directly in combat, attack an enemy on this tile. Cycle through all enemies.
+    firstStrikeDone = False     # First hit of combat comes at 0.2 seconds. Everything after is 1 second.
+    combatProgress = 0          # Time "charging" up an attack, or a fist. Works like any other __Progress.
+    combat_target_cycle = 0     # If not brawling directly in combat, attack an enemy on this tile. Cycle through all enemies.
 
     def __init__(self, species, shipOnboard, crewNameDatabase):
         self.name = choice(crewNameDatabase) # Name should be dependent on species
@@ -460,6 +587,7 @@ class Crew(object):
             "Health": 100,                      # Rock, Crystal, Zoltan, Drones
             "maxHealth": 100,
             "Damage": 1,                # Random damage modifier. 0.5 for Engi, 1.5 for Mantis
+            "Can fight": True,                  # Repair bots, AEGIS, Anonymous, Ion Intruders cannot fight
             "Repair speed": 1,                  # Engi, Mantis, Repair Drone
             "Stun duration": 0,
             "Movement speed": 1,                # Mantis, Rock, Lanius, Crystal, Drones
@@ -486,6 +614,7 @@ class Crew(object):
 
 
   # Set starting stats dependent on species.
+  # ! What if the crew is experienced on generation? I.E. Virus comes with max experience in all skills
     def generateCrew(self, species, parentShip):
 
         if parentShip.isPlayer == False:
@@ -565,7 +694,7 @@ class Crew(object):
 
 
     def moveAction(self):
-        self.movementProgress += self.stats["Movement speed"]
+        self.movementProgress += self.stats["Movement speed"] * secondsInterval
 
         while self.movementProgress >= 1:
             self.movementProgress -= 1
@@ -594,77 +723,91 @@ class Crew(object):
         # Always fight enemy crewmembers. This takes precedence over any other task.
         if ( (self.stats["Allegiance"] == "friendly" and len(self.location.crewInRoom["hostile"]) > 0) or 
             (self.stats["Allegiance"] == "hostile" and len(self.location.crewInRoom["friendly"]) > 0) ):
-            self.combatAction()
 
-        # If present in enemy system, start destroying it. You cannot trash a completely destroyed system!
-        elif ( self.location.system.name != "Empty" and self.location.system.damage < self.location.system.systemLevel and
-                (self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "friendly" or
-                self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "hostile") ):
-            self.destroySystemAction()
-            
-        # If room has fires, firefight. Only extinguish fires on your own ship.
-        elif ( len(self.location.fires) > 0 and 
-                (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
-                self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
-            self.firefightingAction()
-
-        # If room has breaches, repair them. Only repair breaches on your own ship.
-        elif ( len(self.location.breaches) > 0 and 
-                (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
-                self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
-            self.repairBreachAction()
-
-        # If room's system is damaged, repair it. Only repair friendly systems.
-        elif ( self.location.system.damage > 0 and 
-                (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
-                self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
-            self.repairSystemAction()
-
-        #elif needtoreposition
-            #print("DEBUGGING - Reposition to man system / fight boarder")
-
-        # If room can be manned and it's not manned, man it. Only man friendly systems.
-        elif ( self.location.system.manned == False and 
-                (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
-                self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
-            self.location.system.manned = True
-            self.location.system.mannedCrewMate = self
-
-        # Else, idle.
-
-
-    def combatAction(self):
-        self.unmanSystemAction()
-        me = self.stats["Allegiance"]
-        if me == "friendly":
-            them = "hostile"
-        elif me == "hostile":
-            them = "friendly"
-
-        numEnemies = len(self.location.crewInRoom[them])
-
-        if (self.roomPositionIndex) + 1 > numEnemies:
-            #print("DEBUGGING - I'm all alone, I should be attacking someone!")
-        # Attack enemies in clockwise order once each before repeating cycle
-            if self.combat_target_cycle < numEnemies:
-                combat_target = self.location.crewInRoom[them][self.combat_target_cycle]
-                self.combat_target_cycle += 1
-
-            elif self.combat_target_cycle == numEnemies:
-                self.combat_target_cycle = 0
-                combat_target = self.location.crewInRoom[them][self.combat_target_cycle]
-                self.combat_target_cycle += 1                
+            myAllegiance = self.stats["Allegiance"]
+            if myAllegiance == "friendly":
+                theirAllegiance = "hostile"
+            elif myAllegiance == "hostile":
+                theirAllegiance = "friendly"
+            self.combatAction(myAllegiance, theirAllegiance)
 
         else:
-            combat_target = self.location.crewInRoom[them][self.roomPositionIndex] # Fight in same tile
+            self.combatProgress = 0
+            self.firstStrikeDone = False
 
-        dealingDamage = randint(4, 8) * self.stats["Damage"]
-        combat_target.sufferDamage(dealingDamage, self)
+            # If present in enemy system, start destroying it. You cannot trash a completely destroyed system!
+            if ( self.location.system.name != "Empty" and self.location.system.damage < self.location.system.systemLevel and
+                    (self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "friendly" or
+                    self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "hostile") ):
+                self.destroySystemAction()
+                
+            # If room has fires, firefight. Only extinguish fires on your own ship.
+            elif ( len(self.location.fires) > 0 and 
+                    (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
+                    self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
+                self.firefightingAction()
+
+            # If room has breaches, repair them. Only repair breaches on your own ship.
+            elif ( len(self.location.breaches) > 0 and 
+                    (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
+                    self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
+                self.repairBreachAction()
+
+            # If room's system is damaged, repair it. Only repair friendly systems.
+            elif ( self.location.system.damage > 0 and 
+                    (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
+                    self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
+                self.repairSystemAction()
+
+            #elif needtoreposition
+                #print("DEBUGGING - Reposition to man system / fight boarder")
+
+            # If room can be manned and it's not manned, man it. Only man friendly systems.
+            elif ( self.location.system.manned == False and 
+                    (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
+                    self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
+                self.location.system.manned = True
+                self.location.system.mannedCrewMate = self
+
+            # Else, idle.
+
+
+    def combatAction(self, me, them):
+        self.unmanSystemAction()
+
+        numEnemies = len(self.location.crewInRoom[them])
+        self.combatProgress += secondsInterval
+
+        # First hit of combat is fast - 0.2 seconds in. Every second thereafter produces a hit.
+        if (self.combatProgress >= 0.2 and self.firstStrikeDone == False) or self.combatProgress >= 1:
+            self.firstStrikeDone = True
+            self.combatProgress = 0
+
+            # If we outnumber enemies, then someone is by himself providing support to others.
+            #   He will attack each enemy in clockwise order once before repeating
+            if (self.roomPositionIndex) + 1 > numEnemies:
+                #print("DEBUGGING - I'm all alone, I should be attacking someone!")
+                if self.combat_target_cycle < numEnemies:
+                    combat_target = self.location.crewInRoom[them][self.combat_target_cycle]
+                    self.combat_target_cycle += 1
+
+                elif self.combat_target_cycle == numEnemies:
+                    self.combat_target_cycle = 0
+                    combat_target = self.location.crewInRoom[them][self.combat_target_cycle]
+                    self.combat_target_cycle += 1                
+
+            # Fight enemy that is in same tile as me
+            else:
+                combat_target = self.location.crewInRoom[them][self.roomPositionIndex] 
+
+            dealingDamage = randint(4, 8) * self.stats["Damage"]
+            combat_target.sufferDamage(dealingDamage, self)
+            #print("DEBUGGING - I, %s, just hit this punk, %s, for %d damage." % (self.name, combat_target.name, dealingDamage) )
 
         
 
     def destroySystemAction(self):
-        self.location.system.damageProgress += 1 # All crew deal equal system damage
+        self.location.system.damageProgress += secondsInterval # All crew deal equal system damage
 
         if self.location.system.damageProgress >= 10: # When system accumulates enough damage, damage a power bar.
             self.location.system.damage += 1
@@ -681,7 +824,7 @@ class Crew(object):
     def repairSystemAction(self):
         # What happens to the system's power when repaired?
         self.unmanSystemAction()
-        self.location.system.repairProgress += self.stats["Repair speed"]
+        self.location.system.repairProgress += self.stats["Repair speed"] * secondsInterval
 
         if self.location.system.repairProgress >= 10: # When system accumulates enough repair, repair a power bar.
             self.location.system.damage -= 1
@@ -700,7 +843,8 @@ class Crew(object):
     
     def repairBreachAction(self):
         self.unmanSystemAction()
-        self.location.breaches[0] -= self.stats["Repair speed"] # First breach in list 'loses' health at the rate of repair speed.
+        # First breach in list 'loses' health at the rate of repair speed.
+        self.location.breaches[0] -= self.stats["Repair speed"] * secondsInterval 
 
         if self.location.breaches[0] <= 0: 
             del self.location.breaches[0]   # Breaches don't 'move' tiles. They stay where they are. Change?
@@ -715,7 +859,8 @@ class Crew(object):
 
     def firefightingAction(self):
         self.unmanSystemAction()
-        self.location.fires[0] -= self.stats["Fire fighting speed"] # First fire in list 'loses' health at the rate of fire fighting speed.
+        # First fire in list 'loses' health at the rate of fire fighting speed.
+        self.location.fires[0] -= self.stats["Fire fighting speed"] * secondsInterval 
 
         if self.location.fires[0] <= 0: 
             del self.location.fires[0]
@@ -764,7 +909,6 @@ class Crew(object):
     def earnXP(self, whatSkill):
         if self.experience_skills[whatSkill][0] < 2:    # Do not earn XP if max level already
             self.experience_skills[whatSkill][1] += 1
-            print("DEBUGGING - %s has earned XP toward %s." % (self.name, whatSkill) )
             if self.experience_skills[whatSkill][1] >= self.experience_skills[whatSkill][2]:
                 self.experience_skills[whatSkill][0] += 1
                 self.experience_skills[whatSkill][1] = 0
