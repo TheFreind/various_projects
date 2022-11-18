@@ -39,10 +39,7 @@ systemsDatabase = {
 }
 
 
-
-# Database of Weapon objects in FTL (converted to Tuple later). Info imported from ..Data.py weaponsDatabase  
-weaponsCollection = []
-
+# Is this tuple even necessary?
 #systemsCollection = ("Piloting", "Engines", "Weapons", "Shields", "Oxygen", "Medbay", "Clone Bay", "Drone Control",
 #                "Backup Battery", "Doors", "Sensors", "Hacking", "Mind Control", "Cloaking", "Teleporter")
 
