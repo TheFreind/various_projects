@@ -1,16 +1,3 @@
-## ------- DIRECTORY
-## 17  | Ship
-## 109 | Weapon
-## 165 | Room
-## 187 | System
-## 222 | Drone
-## 230 | Crew
-##
-##
-##
-
-
-
 
 from random import randint, choice
 from math import floor
@@ -25,9 +12,11 @@ class Ship(object):
     shields = 0
     shield_recharge_progress = 0
     shield_recharge_speed = 3 # Determined by manning crew, etc. Constant set to 3 seconds for now.
+    clone_bay_queue = []
+
     evasion = 0
     oxygen = 100
-    clone_bay_queue = []
+    reactorUsage = 0
 
     # Might need to add "rooms" parameter
     def __init__(self, name, playableShipsCollection):
@@ -45,12 +34,13 @@ class Ship(object):
             self.hull = 30
             self.missiles = 12      # Missiles imported from Data
             self.drone_parts = 0    # Ditto
-            self.reactor = 8        # Ditto
+            self.reactorLevel = 8        # Ditto
             self.isPlayer = True
         else:
             self.hull = randint(5, 15) # Should be bigger for bigger ships
             self.missiles = randint(5, 10)
             self.drone_parts = randint(4, 8)
+            self.reactorLevel = randint(7, 10)    # ---- how to determine reactor for enemy ships?
             self.isPlayer = False
 
     def __repr__(self):
@@ -136,134 +126,28 @@ class Ship(object):
         # Evasion = (Power in engines + crew in Pilots/Engines) * Multiplier from auto-pilot + cloak evasion
         self.evasion = (dodgeFromEngines[enginesRoom.system.power] + dodgeFromPiloting + dodgeFromEngineering)*autoPilotDodgeMultiplier + cloakEvasion
 
-    # Needs more work
-    # def fireWeapon(self, gun, target):
-    #     print(f"\n{gun} is firing at {target}!")
-    #     # Choose room, hit shields, miss shots, damage system, damage crew, etc...
-    #     # Enter targetting room. This here is just random room selection.
-
-    #     if self.systems["Weapons"].manned == True:
-    #         self.systems["Weapons"].mannedCrewMate.earnXP("Weapons") 
-        
-    # # Suggestion: Make AI more likely to target high-value systems.
-    #     for shot in range(gun.projectiles):
-
-    #         room_targetted = choice(target.rooms) 
-    #         roll_to_hit = randint(1, 100)
-    #         if target.evasion > roll_to_hit and gun.type != "Beam":     # Beams cannot miss
-    #             print("-- MISS!")
-    #             # Crewmembers get XP for dodging
-    #             if target.systems["Piloting"].manned == True:
-    #                 target.systems["Piloting"].mannedCrewMate.earnXP("Piloting") 
-    #             if target.systems["Engines"].manned == True:
-    #                 target.systems["Engines"].mannedCrewMate.earnXP("Engines") 
-                                
-    #         else:
-    #         ## Now evaluate what happens to the shields ##
-    #             shieldsPenetrated = False
-    #             damageDone = 0
-    #             #print("Gun type:", gun.type)
-    #             #print("Target shields:", target.shields)
-
-    #             if gun.type == "Beam":
-    #                 if (gun.damage - target.shields) * gun.beam_length > 0:
-    #                     shieldsPenetrated = True
-    #                 damageDone = (gun.damage - target.shields) * gun.beam_length
-    #             else:
-    #                 if target.shields > 0:
-    #                     if gun.type == "Ion":
-    #                         # Add ion damage to shields system
-    #                         pass#
-
-    #                     elif gun.type != "Missile" and gun.type != "Bomb": # If not a bomb and missile type, projectile hits shield 
-    #                         target.shields -= 1
-    #                         print("-- Shield hit!")#
-    #                         if target.systems["Shields"].manned == True:
-    #                             target.systems["Shields"].mannedCrewMate.earnXP("Shields") 
-
-    #                     else:
-    #                         shieldsPenetrated = True
-    #                         damageDone = gun.damage
-
-    #                 elif target.shields == 0:
-    #                     shieldsPenetrated = True
-    #                     damageDone = gun.damage
-
-    #             if shieldsPenetrated == True:
-    #                 if room_targetted.system != "Empty": # System damage done, shift power level
-    #                     room_targetted.system.damage += damageDone         
-    #                     room_targetted.system.determineDamage()
-
-    #                 for allegiance in room_targetted.crewInRoom:    # Crew damage applied to all crew in room
-    #                     for crew in room_targetted.crewInRoom[allegiance]:
-    #                         crew.sufferDamage(gun.crew_damage, gun)
-
-    #                 roll_to_add_fire = randint(1, 100)
-    #                 roll_to_add_breach = randint(1, 100)
-    #                 roll_to_stun = randint(1, 100)
-
-    #                 if roll_to_add_fire <= gun.fire_chance: 
-    #                     room_targetted.startFire("Weapon", gun.name)
-
-    #                 if roll_to_add_breach <= gun.breach_chance and len(room_targetted.breaches) < room_targetted.size:
-    #                     room_targetted.breaches.append(10)
-    #                     print("-! Hull breached!")
-                    
-    #                 if roll_to_stun <= gun.stun_chance:
-    #                     if len(room_targetted.crewInRoom) > 0: # Notification. Could be refined further.
-    #                         if len(room_targetted.crewInRoom["friendly"]) > 0:
-    #                             namesFoundFriendly = "  FRIENDLIES: "
-    #                             for crew in room_targetted.crewInRoom["friendly"]:
-    #                                 namesFoundFriendly += crew.name + " | "
-    #                             print(namesFoundFriendly + "have been stunned!")
-    #                         if len(room_targetted.crewInRoom["hostile"]) > 0:
-    #                             namesFoundHostile = "  HOSTILES: "
-    #                             for crew in room_targetted.crewInRoom["hostile"]:
-    #                                 namesFoundHostile += crew.name + " | "
-    #                             print(namesFoundHostile + "have been stunned!")
-
-
-    #                     for allegiance in room_targetted.crewInRoom:
-    #                         for crew in room_targetted.crewInRoom[allegiance]:
-    #                             crew.stats["Stun duration"] += gun.stun_duration
-
-
-    #             if damageDone > 0:
-    #                 target.hull -= damageDone
-    #                 print(f"-- Target room: {room_targetted.system} | {target}'s Hull: {target.hull}") # Debugging
-
-    #             if target.hull <= 0:
-    #                 target.destroyed = True
-
-
-    #     gun.charge = 0
-    #     if gun.type == "Missile" or gun.type == "Bomb":
-    #         self.missiles -= 1
-
-
-
-
-
 
 # Types - Laser, Flak, Missile, Bomb, Beam, Ion
 class Weapon(object):
 
-    def __init__(self, ship, name, type, damage, cooldown, projectiles, powerNeeded, shopCost):
+    def __init__(self, ship, name, type, damage, cooldown, projectiles, projectilesTime, powerNeeded, shopCost):
         self.parentShip = ship
         self.name = name    
         self.type = type
         self.damage = damage
+        self.beam_length = 0
+        self.ion_damage = 0
         self.cooldown = cooldown
         self.charge = 0
         self.projectiles = projectiles
+        self.projectilesTime = projectilesTime
         self.powerNeeded = powerNeeded
         self.shopCost = shopCost
         
-        self.ion_damage = 0      # Chances are in %
-        self.fire_chance = 0    
+        self.fire_chance = 0    # Chances are in %
         self.breach_chance = 0
         self.stun_chance = 0
-        self.beam_length = 0
+
 
         self.autoFire = True    # When enemy AI cloaks, it deactivates autoFire and reenables when exiting cloak
         self.powered = True 
@@ -300,15 +184,52 @@ class Weapon(object):
     def __repr__(self):
         return self.name
 
+
+    def checkWeaponStatus(self, ourShip, targetShip, projectilesInFlight):
+        if ourShip.systems["Weapons"].manned == True:
+            crewMateSkillList = [0.10, 0.15, 0.20]
+            crewMateBonus = crewMateSkillList[ourShip.systems["Weapons"].mannedCrewMate.experience_skills["Weapons"][0]]
+        else:
+            crewMateBonus = 0
+
+        # ! Add Weapon Recharger augments here for -15% Charge time
+        otherModifiers = 0 
+
+        timeToCharge = self.cooldown * (1 - crewMateBonus - otherModifiers) 
+
+        if self.charge < 0:
+            self.charge = 0
+
+        if self.charge >= timeToCharge and self.autoFire == True:
+            #print("DEBUGGING - FIRING WEAPON %s DURING SECOND %d" % (gun.name, SECONDS_ELAPSED))
+            self.fireWeapon(targetShip, projectilesInFlight)
+        elif self.charge >= timeToCharge and self.autoFire == False:
+            #print("#%d [%s] %s - READY" % (index+1, "I"*gun.powerNeeded, gun) )
+            pass
+        #elif gun.charge < timeToCharge:
+        #    #print("#%d [%s] %s - %ds remaining..." % (index+1, "I"*gun.powerNeeded, gun, (gun.cooldown-gun.charge)) )
+        #    pass
+
+
+
     # -- target is the enemyShip object.
-    def fireWeapon(self, target):
+    def fireWeapon(self, target, projectilesInFlight):
         print(f"\n{self} is firing at {target}!")
         # Choose room, hit shields, miss shots, damage system, damage crew, etc...
         # Enter targetting room. This here is just random room selection.
 
         if self.parentShip.systems["Weapons"].manned == True:
             self.parentShip.systems["Weapons"].mannedCrewMate.earnXP("Weapons") 
-        
+
+        projectileData = [self, self.projectilesTime, target]
+        projectilesInFlight.append( projectileData )
+
+        self.charge = 0
+        if self.type == "Missile" or self.type == "Bomb":
+            self.parentShip.missiles -= 1
+
+
+    def resolveHit(self, target):
     # Suggestion: Make AI more likely to target high-value systems.
         for shot in range(self.projectiles):
 
@@ -322,12 +243,14 @@ class Weapon(object):
                 if target.systems["Engines"].manned == True:
                     target.systems["Engines"].mannedCrewMate.earnXP("Engines") 
                                 
-            else:
-            ## Now evaluate what happens to the shields ##
+            else: ## Now evaluate what happens to the shields ##
                 shieldsPenetrated = False
-                damageDone = 0
-                #print("Gun type:", gun.type)
-                #print("Target shields:", target.shields)
+                if self.type == "Ion":
+                    damageDone = self.ion_damage
+                    ion_weapon = True
+                else:
+                    damageDone = 0
+                    ion_weapon = False
 
                 if self.type == "Beam":
                     if (self.damage - target.shields) * self.beam_length > 0:
@@ -335,13 +258,14 @@ class Weapon(object):
                     damageDone = (self.damage - target.shields) * self.beam_length
                 else:
                     if target.shields > 0:
-                        if self.type == "Ion":
-                            # Add ion damage to shields system
-                            pass#
+                        if self.type == "Ion":  # Add ion damage to shields system
+                            target.systems["Shields"].ion_damage += self.ion_damage
+                            target.systems["Shields"].ion_duration += self.ion_damage * 5
+                            target.systems["Shields"].determineDamage()
 
                         elif self.type != "Missile" and self.type != "Bomb": # If not a bomb and missile type, projectile hits shield 
                             target.shields -= 1
-                            print("-- Shield hit!")#
+                            print("-- Shield hit on %s!" % (self.parentShip))#
                             if target.systems["Shields"].manned == True:
                                 target.systems["Shields"].mannedCrewMate.earnXP("Shields") 
 
@@ -354,9 +278,9 @@ class Weapon(object):
                         damageDone = self.damage
 
                 if shieldsPenetrated == True:
-                    if room_targetted.system != "Empty": # System damage done, shift power level
-                        room_targetted.system.damage += damageDone         
-                        room_targetted.system.determineDamage()
+                    if room_targetted.system != "Empty": # System damage done, shift power level     
+                        room_targetted.system.damageSystem(damageDone, ion_weapon)
+                        room_targetted.system.ion_duration += self.ion_damage * 5
 
                     for allegiance in room_targetted.crewInRoom:    # Crew damage applied to all crew in room
                         for crew in room_targetted.crewInRoom[allegiance]:
@@ -400,11 +324,6 @@ class Weapon(object):
                     target.destroyed = True
 
 
-        self.charge = 0
-        if self.type == "Missile" or self.type == "Bomb":
-            self.parentShip.missiles -= 1
-
-
 # Each room should have spaces for people, # of vents, breaches, fire, o2 in the room, and a system.
 # A ship has a list of room OBJECTS, whose data is pulled from a dictionary  
 class Room(object):
@@ -414,6 +333,7 @@ class Room(object):
         self.vents = vents
         self.oxygen = 100
         self.parentShip = parentShip
+        self.visible = False            # Rooms you have vision of by sensors, crew, slug Telepathy
 
         self.crewInRoom = {
             "friendly": [],
@@ -457,10 +377,14 @@ class System(object):
     damageProgress = 0      # Intruders and fire damage systems. 1 system damage when >= 10. Reset if room empty of hostiles. DONOT reset if fire present.
     damage = 0              # Damage to system prevents power intake to the system.
     ion_damage = 0
+    ion_duration = 0
     parentRoom = ""         # System has access to the Room object that it resides in.
+
+    subsystems = ["Piloting", "Sensors", "Doors", "Backup Battery"]
 
     def __init__(self, name, startingSystemLevel, maxUpgradeableLevel):
         mannableSystems = ["Piloting", "Shields", "Weapons", "Engines", "Sensors", "Doors"]
+
 
         self.name = name
         self.systemLevel = startingSystemLevel      
@@ -476,23 +400,65 @@ class System(object):
     def __repr__(self):
         return self.name
 
-    # When a system takes damage, reduce its power by damage. If system is fixed, restore power as necessary.
-    # ! System blasted may be entirely unnecessary  
-    #def determineDamage(self, shipClass, systemBlasted):
+    # What if, seperate function for repair, seperate function for damage?
+    # And then the determineDamage is called in those functions to ensure power is viable.
+    def damageSystem(self, damageDone, isIon):
+        if isIon == False:
+            # System suffers damage. Total damage cannot exceed systemLevel.
+            if self.damage + damageDone > self.systemLevel:
+                damageDone = self.systemLevel - self.damage     
+            self.damage += damageDone
+
+            # Refund reactor power back to the ship equal to damage. Do not refund 'unpowered' damage.
+            if damageDone > self.power:
+                damageDone = self.power
+            refundReactorPower = damageDone
+            if self.name not in self.subsystems:    # Refund power. Subsystems are free - don't refund power.
+                self.parentRoom.parentShip.reactorUsage -= refundReactorPower
+                #print("DEBUGGING - %d power has been refunded from %s. Now using up %d power." % (refundReactorPower, self.name, self.parentRoom.parentShip.reactorUsage) )
+
+            # Engage double-check function. System power is reduced accordingly by damage.
+            self.determineDamage()
+
+
+    def repairSystem(self, repairAmount):
+        if repairAmount > self.damage:
+            repairAmount = self.damage
+        self.damage -= repairAmount
+
+        # EXAMPLE - Lvl 4 shields; 4 memory, 3 damage, 1 power
+
+        # When adding back in power, there must be available power. Break if so.
+        for x in range(repairAmount):
+            if self.parentRoom.parentShip.reactorUsage >= self.parentRoom.parentShip.reactorLevel:
+                print("ERROR - Insufficient reactor power for %s." % (self.name) )
+                break
+
+            if self.power + 1 <= self.systemPowerMemory:
+                if self.name not in self.subsystems:    # Subsystems do not use ship power
+                    self.parentRoom.parentShip.reactorUsage += 1
+
+            self.determineDamage()
+
+
+    # When a system is damaged/repaired, update its power correctly. Check 
     def determineDamage(self):
         self.power = self.systemPowerMemory - self.damage - self.ion_damage       # ! Wait... how does ion damage work with actual damage?
         if self.power < 0:  # Cannot have negative power in a system
             self.power = 0
         if self.damage > self.systemLevel: # Cannot have more damage in a system than its system level
             self.damage = self.systemLevel
+        if self.parentRoom.parentShip.reactorUsage < 0: # Cannot be using less power in reactor than there is in it
+            self.parentRoom.parentShip.reactorUsage = 0
 
-        # Is this necessary at all? I think it can be included in rejuvenate shields
-        ## if systemBlasted.name == "Shields":
-        ##     shipClass.shields = floor(systemBlasted.power / 2)
+
+        # Systems that get damaged may have adverse effects
+        if self.name == "Shields":
+            self.parentRoom.parentShip.shields = floor(self.power / 2)
 
         # ! Copy paste this segment of code for Drones.
         # If weapons are damaged, check if any weapons get de-powered
-        if self.name == "Weapons": 
+        elif self.name == "Weapons": 
 
             powerToSpare = self.power   # Check if power in Weapons is enough for each gun
             finalPower = []             # Remember how much power we are using from each gun
@@ -527,18 +493,28 @@ class System(object):
 
     # powerUp and powerDown are for when the player manually increases or decreases power in a system
     def powerUp(self):
-        if self.power < self.systemLevel:
+        if self.power < self.systemLevel and self.parentRoom.parentShip.reactorUsage < self.parentRoom.parentShip.reactorLevel and self.ion_duration == 0:
             self.power += 1
             self.systemPowerMemory = self.power
+            self.parentRoom.parentShip.reactorUsage += 1
         else:
-            print("\nNOTE: System is at maximum power. Cannot inject any more power!")
+            if self.power >= self.systemLevel:
+                print("\nNOTE: System is at maximum power. Cannot inject any more power!")
+            elif self.parentRoom.parentShip.reactorUsage >= self.parentRoom.parentShip.reactorLevel:
+                print("\nNOTE: All reactor power is being used. Cannot power up this system!")
+            elif self.ion_duration > 0:
+                print("\nNOTE: Power cannot flow through ionized systems!")
 
     def powerDown(self):  
-        if self.power > 0:
+        if self.power > 0 and self.ion_duration <= 0:
             self.power -= 1
             self.systemPowerMemory = self.power
+            self.parentRoom.parentShip.reactorUsage -= 1
         else:
-            print("\nNOTE: Cannot power down a system at 0 power.")
+            if self.power == 0:
+                print("\nNOTE: Cannot power down a system at 0 power.")
+            elif self.ion_duration > 0:
+                print("\nNOTE: Power cannot flow through ionized systems!")
 
 
     # ! Big exception! Medbay hacking must not only stop medbay healing, but cause damage
@@ -551,15 +527,10 @@ class System(object):
                 medbayHealingModifier = [0, 1, 1.5, 3]
                 crewObject.stats["Health"] += 6.4 * medbayHealingModifier[self.power] * secondsInterval
 
+    # Cloaking, MC, Battery, TP, Hacking, etc
+    def activateSystem(self):
+        pass
 
-# Types: Ship drone, Boarding drone, attack drone, defense drone
-# ! Make Boarding and Ship drones a subclass of Crew.
-class Drone(object):
-    health = 100
-
-    def __init__(self, name, type):
-        self.name = name
-        self.type = type
 
 class Crew(object):
     # Other Variables defined in __init__ --> [self.name, self.species, self.location, self.locationIndex, self.destinationIndex]
@@ -762,8 +733,8 @@ class Crew(object):
             #elif needtoreposition
                 #print("DEBUGGING - Reposition to man system / fight boarder")
 
-            # If room can be manned and it's not manned, man it. Only man friendly systems.
-            elif ( self.location.system.manned == False and 
+            # If room can be manned and it's not manned, man it. Unless it's ionized. Only man friendly systems.
+            elif ( self.location.system.manned == False and self.location.system.ion_duration <= 0 and
                     (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
                     self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
                 self.location.system.manned = True
@@ -810,8 +781,7 @@ class Crew(object):
         self.location.system.damageProgress += secondsInterval # All crew deal equal system damage
 
         if self.location.system.damageProgress >= 10: # When system accumulates enough damage, damage a power bar.
-            self.location.system.damage += 1
-            self.location.system.determineDamage()
+            self.location.system.damageSystem(1, False)
             self.location.system.damageProgress = 0
 
             self.earnXP("Fighting")
@@ -827,8 +797,7 @@ class Crew(object):
         self.location.system.repairProgress += self.stats["Repair speed"] * secondsInterval
 
         if self.location.system.repairProgress >= 10: # When system accumulates enough repair, repair a power bar.
-            self.location.system.damage -= 1
-            self.location.system.determineDamage()
+            self.location.system.repairSystem(1)
             self.location.system.repairProgress = 0
 
             # Earn XP
@@ -919,3 +888,12 @@ class Crew(object):
                 elif whatSkill == "Repairing":
                     self.stats["Repair speed"] += 0.1
                     self.stats["Fire fighting speed"] += 0.1
+
+
+# Types: Ship drone, Boarding drone, attack drone, defense drone
+# ! Make Boarding and Ship drones a subclass of Crew.
+class Drone(Crew):
+    def __init__(self):
+        pass
+
+    
