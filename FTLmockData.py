@@ -1,10 +1,10 @@
 # List containing weapons in FTL. Format is built around the Weapon class parameters.
-## "Name" : ["Type", damage, cooldown, projectiles, powerNeeded, cost] 
+## "Name" : ["Type", damage, cooldown, projectiles, projectileTime, powerNeeded, cost] 
 ## Missing values will be represented by None
-weaponsDatabase = { "Basic Laser": ["Laser",1,10,1,1,20],  "Burst Laser Mk II": ["Laser",1,12,3,2,60], 
-                    "Small Bomb": ["Bomb",2,14,1,1,20],      "Mini Beam": ["Beam",1,10,1,1,20], 
-                    "Flak I": ["Flak",1,8,3,2,40],           "Artemis": ["Missile",2,11,1,1,40],
-                    "Ion Blast": ["Ion",1,8,1,1,10]
+weaponsDatabase = { "Basic Laser": ["Laser",1,10,1,1,1,20],  "Burst Laser Mk II": ["Laser",1,12,3,1,2,60], 
+                    "Small Bomb": ["Bomb",2,14,1,1,1.5,20],      "Mini Beam": ["Beam",1,10,1,0,1,20], 
+                    "Flak I": ["Flak",1,8,3,2,2,40],           "Artemis": ["Missile",2,11,1,1.7,1,40],
+                    "Ion Blast": ["Ion",1,8,1,2,1,10]
                 }
 
 # [Weapons], [Drones], [Systems], [SystemsStartingLevel], [crew], [augmentations], 
