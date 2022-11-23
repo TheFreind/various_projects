@@ -15,6 +15,7 @@
 #   System effects.
 #   Door system
 #   Proper randomized enemy loadouts. They're pre-set.
+#   Breaches suck out oxygen
 
 # Cool idea - What if all print statements are put into a "notification" list?
 #   And there are different kinds, like crewNotifications, shipNotifications, etc...
@@ -22,9 +23,12 @@
 #   get a corresponding notification (unless its obvious)!
 
 # UNTESTED FEATURES
-# The stun function  
+# Zoltan death explosion found in SufferDamage()
+# All ion weaponry, including system ionization
 # The loop in system.repairSystem(), regarding determineDamage. Any problems if Weapons is repaired by a repair bomb?
 #   Speaking of which, the whole process of siphoning/delegating reactor power
+# Drones healing in DroneControl
+# Drone healing in DroneControl is 3.2 HP/second, I don't know if that's the actual value. Need researching.
 
 # CURRENT BUGS.
 # Fired at enemy ship's weapons. Enemy crewmember on MY SHIP got stunned. huh?
@@ -105,7 +109,7 @@ def grantStartingGear(shipClass):
 
         ### Get crew ####
             for person in startingGear[selectShip][4]:
-                Crew(person, shipClass, crewNameDatabase)
+                Crew(person, shipClass, crewNameDatabase, dronesDatabase)
 
         # Is enemy ship an auto ship? Give it its property.
             if shipClass.name in enemyAutoShips:
@@ -146,7 +150,7 @@ def checkProjectiles(projectilesInFlight):
 
 
 SCRAP = 20
-FUEL = 13
+FUEL = 16
 # missiles and drone_parts variables are found in ship classes.
 
 print("-----------------------------------------\n\n\n")
@@ -188,7 +192,7 @@ playerShip.crew[0].destinationIndex = 3    # First crewmember goes to Kestrel's 
 playerShip.crew[2].destinationIndex = 4    # Third crewmember goes to Kestrel's 5th room (Shields)
 #playerShip.systems["Medbay"].parentRoom.fires.append(40)    # Add a testing fire to see if it does damage
 
-playerShip.crew.append( Drone() )
+
 #print(playerShip.crew[3].movementProgress)
 
 
@@ -234,6 +238,7 @@ while enemyShip.destroyed == False:
         # Ion duration on systems reduced
         # Sensors, crew, telepathy reveals rooms 
         # ! Telepathy not implemented yet
+        # Oxygen must not exceed 100; must not be lower than 0
         for room in thisPlayer.rooms:
             if room.system != "Empty":
                 room.system.checkCrewPresence(room)
@@ -249,18 +254,31 @@ while enemyShip.destroyed == False:
             else:
                 room.visible = False
 
+            if room.oxygen > 100:
+                room.oxygen = 100
+            elif room.oxygen < 0:
+                room.oxygen = 0
+
         for crewMember in thisPlayer.crew: 
-            if crewMember.location.system.name == "Medbay": # Crew always heal if in medbay
+            # Crew always heal if in medbay; Drones heal if in Drone Control and are powered.
+            if crewMember.location.system.name == "Medbay" and crewMember.isDrone == False: 
                 crewMember.location.system.medbayHeal(crewMember)
+            elif crewMember.location.system.name == "Drone Control" and crewMember.isDrone == True:
+                crewMember.location.system.droneControlHeal(crewMember)
+
             if crewMember.location.oxygen <= 5:             # Crew suffocate from low oxygen
                 crewMember.sufferDamage(6.4 * secondsInterval * crewMember.stats["Suffocation damage"], "Suffocation")
 
             # Crew members do not take actions when stunned. Count down stun duration and skip this second.
             if crewMember.stats["Stun duration"] > 0:
                 crewMember.stats["Stun duration"] -= secondsInterval
+            elif crewMember.isDrone == True and crewMember.isPowered == False:
+                pass    # Powered down drones do nothing
             else:
                 if crewMember.locationIndex != crewMember.destinationIndex: # All crewmembers move 1 step closer to their destination
                     crewMember.moveAction()
+                # ! elif crewMember.automated == True:  # Personnel drones have unique task evaluation
+                # !     evaluateRobotTask?
                 else:
                     crewMember.evaluateTask()   # If not moving, determine what task to do. Examine this function for details.
 
@@ -274,7 +292,8 @@ while enemyShip.destroyed == False:
             else:
                 oxygenRegenerationRateModifier = [0, 1, 2, 3]
                 for room in thisPlayer.rooms:
-                    room.oxygen += 1.2 * secondsInterval * oxygenRegenerationRateModifier[thisPlayer.systems["Oxygen"].power]
+                    if room.oxygen < 100:
+                        room.oxygen += 1.2 * secondsInterval * oxygenRegenerationRateModifier[thisPlayer.systems["Oxygen"].power]
 
         # Fire suppression augment should extinguish fires in this section of code.
         for room in thisPlayer.rooms:
@@ -327,6 +346,9 @@ while enemyShip.destroyed == False:
                     # If doors on both sides are open, revert back to 50/50. Chances are reduced by level of doors.
                     pass
 
+            #if len(room.breaches) > 0:
+            #    room.oxygen -=  * secondsInterval * len(room.breaches)
+
                 
 
 
@@ -349,7 +371,7 @@ while enemyShip.destroyed == False:
         break
         # Game over will occur
 
-    time.sleep(0.12) # This sleep aligns the game time with real time 
+    #time.sleep(0.12) # This sleep aligns the game time with real time 
 
 
 print("\n ---------- A.A.R. ----------")

@@ -7,6 +7,13 @@ weaponsDatabase = { "Basic Laser": ["Laser",1,10,1,1,1,20],  "Burst Laser Mk II"
                     "Ion Blast": ["Ion",1,8,1,2,1,10]
                 }
 
+# List containing all the drones in FTL.
+## "Name" : [powerNeeded, cost]
+dronesDatabase = { "Boarding Drone": [3, 70], "Anti-Personnel Drone": [2, 35],
+                   "Ion Intruder Drone": [3, 65], "System Repair Drone": [1, 30],
+                }
+
+
 # [Weapons], [Drones], [Systems], [SystemsStartingLevel], [crew], [augmentations], 
 # [Fuel/Missile/Drones/Reactor], maxWeapons and maxDrones...
 startingGear = {

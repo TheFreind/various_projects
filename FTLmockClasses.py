@@ -24,6 +24,7 @@ class Ship(object):
         
 
         self.weapons = []
+        self.drones = []
         self.systems = {}
         self.crew = []
         self.augments = []
@@ -32,8 +33,8 @@ class Ship(object):
 
         if name in playableShipsCollection:
             self.hull = 30
-            self.missiles = 12      # Missiles imported from Data
-            self.drone_parts = 0    # Ditto
+            self.missiles = 12          # Missiles imported from Data
+            self.drone_parts = 0        # Ditto
             self.reactorLevel = 8        # Ditto
             self.isPlayer = True
         else:
@@ -456,7 +457,6 @@ class System(object):
         if self.name == "Shields":
             self.parentRoom.parentShip.shields = floor(self.power / 2)
 
-        # ! Copy paste this segment of code for Drones.
         # If weapons are damaged, check if any weapons get de-powered
         elif self.name == "Weapons": 
 
@@ -476,6 +476,27 @@ class System(object):
             finalPower = sum(finalPower)
             self.power = finalPower     
             # In the end, the Weapons system automatically depowers unaffordable guns and refunds Reactor power
+
+        # If Drone Control gets damaged, check if any drones get de-powered
+        elif self.name == "Drone Control": 
+
+            powerToSpare = self.power   # Check if power in Drone Control is enough for each drone
+            finalPower = []             # Remember how much power we are using from each drone
+
+            for drone in self.parentRoom.parentShip.drones:
+                if powerToSpare >= drone.powerNeeded:
+                    powerToSpare -= drone.powerNeeded
+                    drone.powered = True
+                    finalPower.append(drone.powerNeeded)
+
+                else:
+                    drone.powered = False
+                    finalPower.append(0)
+
+            finalPower = sum(finalPower)
+            self.power = finalPower     
+
+
 
         # etc for other systems
 
@@ -527,6 +548,14 @@ class System(object):
                 medbayHealingModifier = [0, 1, 1.5, 3]
                 crewObject.stats["Health"] += 6.4 * medbayHealingModifier[self.power] * secondsInterval
 
+    # Drones heal in drone control.
+    def droneControlHeal(self, crewDroneObject):
+        if self.power > 0 and crewDroneObject.powered == True:
+            if ( (self.parentRoom.parentShip.isPlayer == True and crewDroneObject.stats["Allegiance"] == "friendly") or 
+                (self.parentRoom.parentShip.isPlayer == False and crewDroneObject.stats["Allegiance"] == "hostile" )):
+                crewDroneObject.stats["Health"] += 3.2 * secondsInterval
+
+
     # Cloaking, MC, Battery, TP, Hacking, etc
     def activateSystem(self):
         pass
@@ -539,11 +568,14 @@ class Crew(object):
     combatProgress = 0          # Time "charging" up an attack, or a fist. Works like any other __Progress.
     combat_target_cycle = 0     # If not brawling directly in combat, attack an enemy on this tile. Cycle through all enemies.
 
-    def __init__(self, species, shipOnboard, crewNameDatabase):
+    def __init__(self, species, shipOnboard, crewNameDatabase, droneDatabase):
         self.name = choice(crewNameDatabase) # Name should be dependent on species
         self.species = species
         self.shipOnboard = shipOnboard  # Which ship is this crewmember on?
         shipOnboard.crew.append(self)   # Add this crewmember to Ship's crew list
+        if "Drone" in species:
+            shipOnboard.drones.append(self)   # Also add this personnel drone to the drones list
+
 
         self.experience_skills = {   # Current Level 0/2, Current XP, XP needed to level up
             "Piloting":     [0, 0, 15],
@@ -557,8 +589,7 @@ class Crew(object):
             "Allegiance": "friendly",
             "Health": 100,                      # Rock, Crystal, Zoltan, Drones
             "maxHealth": 100,
-            "Damage": 1,                # Random damage modifier. 0.5 for Engi, 1.5 for Mantis
-            "Can fight": True,                  # Repair bots, AEGIS, Anonymous, Ion Intruders cannot fight
+            "Damage": 1,                # Random damage modifier. 0.5 for Engi, 1.5 for Mantis. 
             "Repair speed": 1,                  # Engi, Mantis, Repair Drone
             "Stun duration": 0,
             "Movement speed": 1,                # Mantis, Rock, Lanius, Crystal, Drones
@@ -566,18 +597,20 @@ class Crew(object):
             "Suffocation damage": 1,            # Crystal=0.5 | Lanius=0 | Drones=0
             "Store cost": 45,                   # Depends on species
             #"Crew Rarity": 1,                  # Rarity dependent on sector
+            "Can man systems": True,
         # -- ABILITIES -- # 
             "Zoltan power": False,              # Zoltan
-            "Death explosion": False,           # Zoltan
+            "Death explosion": False,           # Zoltan ! Note! Drones take 50% less dmg from this 
             "Telepathy": False,                 # Slug revealing nearby rooms
             "Mind control immunity": False,     # Slug, Drones
             "Fire immunity": False,             # Rock, Drones
             "Drains oxygen": False,             # Lanius
-            "Lockdown ability": False           # Crystal
+            "Lockdown ability": False,          # Crystal
             #"Regenerates oxygen": False        # AEGIS Drone (from my own ideas)
+            "Ion Intruder Pulse": False,
         }
 
-        self.generateCrew(species, shipOnboard) # Set starting stats dependent on species
+        self.generateCrew(species, shipOnboard, droneDatabase) # Set starting stats dependent on species
         self.spawnLocation(shipOnboard, shipOnboard.isPlayer) # Find starting location
 
     def __repr__(self):
@@ -586,40 +619,94 @@ class Crew(object):
 
   # Set starting stats dependent on species.
   # ! What if the crew is experienced on generation? I.E. Virus comes with max experience in all skills
-    def generateCrew(self, species, parentShip):
+    def generateCrew(self, species, parentShip, droneDatabase):
 
         if parentShip.isPlayer == False:
             self.stats["Allegiance"] = "hostile"
 
+        self.isDrone = False     # Becomes true under Drone species logic
+        self.powered = True      # Only relevant for drones. Drones must be powered to do anything.
 
-        if species == "Human":
+        if species == "Human":   #####
             for skill in self.experience_skills: # 10% Lower XP needed to level up
                 self.experience_skills[skill][2] = float(self.experience_skills[skill][2])   # To be reduced by 10%, it must be converted into a floating number
                 self.experience_skills[skill][2] = floor(self.experience_skills[skill][2]*0.9) 
                 self.experience_skills[skill][2] = int(self.experience_skills[skill][2])     # Re-convert back to integer
-        elif species == "Engi":
+        elif species == "Engi":   #####
             self.stats["Store cost"] = 50
             self.stats["Damage"] = 0.5
             self.stats["Repair speed"] = 2
-            self.stats["Fire fighting speed"] = 2
-        elif species == "Zoltan":
+            self.stats["Fire fighting speed"] = 4 * 2
+        elif species == "Zoltan":   #####
             self.stats["Store cost"] = 60
             self.stats["Health"] = 70
             self.stats["maxHealth"] = 70
             self.stats["Zoltan power"] = True
             self.stats["Death explosion"] = True
-        elif species == "Rockman":
+        elif species == "Rockman":   #####
             self.stats["Store cost"] = 55
             self.stats["Health"] = 150    
             self.stats["maxHealth"] = 150
             self.stats["Movement speed"] = 0.5
-            self.stats["Fire fighting speed"] = 1.67
+            self.stats["Fire fighting speed"] = 4 * 1.67
             self.stats["Fire immunity"] = True       
-        # elif species == "Mantis"
-        # elif species == "Lanius"
-        # elif species == "Slug"
-        # elif species == "Crystal"  
-        # elif species == "Boarding Drone" / "Repair Drone" / "Ion Intruder" / "Anti-Personnel Drone"          
+        elif species == "Mantis":   #####
+            self.stats["Store cost"] = 55
+            self.stats["Damage"] = 1.5
+            self.stats["Movement speed"] = 1.2
+            self.stats["Repair speed"] = 2
+            self.stats["Fire fighting speed"] = 4 * 0.5
+        elif species == "Lanius":   #####
+            self.stats["Store cost"] = 50
+            self.stats["Movement speed"] = 0.85
+            self.stats["Drains oxygen"] = True
+            self.stats["Suffocation damage"] = 0
+        elif species == "Slug":   #####
+            self.stats["Store cost"] = 45
+            self.stats["Telepathy"] = True
+            self.stats["Mind control immunity"] = True
+        elif species == "Crystal":   #####
+            self.stats["Store cost"] = 60
+            self.stats["Health"] = 125
+            self.stats["maxHealth"] = 125         
+            self.stats["Fire fighting speed"] = 4 * 0.83  
+            self.stats["Suffocation damage"] = 0.5
+            self.stats["Lockdown ability"] = True
+        # PERSONNEL DRONES
+        # MISSING: My AEGIS and Anonymous Drones
+        elif "Drone" in species:
+            self.isDrone = True     
+            self.automated = True   # Drone Nervous Chip will turn this to False
+            self.powerNeeded = droneDatabase[species][0]
+
+            #parentDroneControl = input a droneControlSystemClass here
+            self.stats["Movement speed"] = 0.5
+            self.stats["Suffocation damage"] = 0
+            self.stats["Fire immunity"] = True
+            self.stats["Mind control immunity"] = True
+            self.stats["Can man systems"] = False
+            self.stats["Store cost"] = droneDatabase[species][1]
+
+            if species == "Boarding Drone" or "Anti-Personnel Drone":
+                self.stats["Health"] = 150
+                self.stats["maxHealth"] = 150
+                self.stats["Repair speed"] = 0
+                self.stats["Fire fighting speed"] = 4 * 0
+            elif species == "System Repair Drone":
+                self.stats["Health"] = 30       # ! Is it 30 HP? Is that correct?
+                self.stats["maxHealth"] = 30
+                self.stats["Damage"] = 0
+                self.stats["Repair speed"] = 2
+                self.stats["Fire fighting speed"] = 4 * 2
+            elif species == "Ion Intruder Drone":
+                self.stats["Health"] = 125      # Base game stats; my version would have 100 health   
+                self.stats["maxHealth"] = 125
+                self.stats["Damage"] = 0
+                self.stats["Repair speed"] = 0
+                self.stats["Fire fighting speed"] = 4 * 0
+                self.stats["Ion Intruder Pulse"] = True
+
+            # Store cost conditions should be implemented here
 
 
   # Spawn crewmember in piloting if your ship; pre-determined important systems if hostile. 
@@ -691,9 +778,10 @@ class Crew(object):
 
 
     def evaluateTask(self):
-        # Always fight enemy crewmembers. This takes precedence over any other task.
+        # Always fight enemy crewmembers (if you can fight). This takes precedence over any other task.
         if ( (self.stats["Allegiance"] == "friendly" and len(self.location.crewInRoom["hostile"]) > 0) or 
-            (self.stats["Allegiance"] == "hostile" and len(self.location.crewInRoom["friendly"]) > 0) ):
+            (self.stats["Allegiance"] == "hostile" and len(self.location.crewInRoom["friendly"]) > 0) and
+            self.stats["Damage"] > 0 ):
 
             myAllegiance = self.stats["Allegiance"]
             if myAllegiance == "friendly":
@@ -706,26 +794,29 @@ class Crew(object):
             self.combatProgress = 0
             self.firstStrikeDone = False
 
+            # Ion Intruder Code to activate its pulse
+
             # If present in enemy system, start destroying it. You cannot trash a completely destroyed system!
             if ( self.location.system.name != "Empty" and self.location.system.damage < self.location.system.systemLevel and
                     (self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "friendly" or
-                    self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "hostile") ):
+                    self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "hostile") and
+                    self.stats["Damage"] > 0 ):
                 self.destroySystemAction()
                 
             # If room has fires, firefight. Only extinguish fires on your own ship.
-            elif ( len(self.location.fires) > 0 and 
+            elif ( len(self.location.fires) > 0 and self.stats["Repair speed"] > 0 and
                     (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
                     self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
                 self.firefightingAction()
 
             # If room has breaches, repair them. Only repair breaches on your own ship.
-            elif ( len(self.location.breaches) > 0 and 
+            elif ( len(self.location.breaches) > 0 and self.stats["Repair speed"] > 0 and 
                     (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
                     self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
                 self.repairBreachAction()
 
             # If room's system is damaged, repair it. Only repair friendly systems.
-            elif ( self.location.system.damage > 0 and 
+            elif ( self.location.system.damage > 0 and self.stats["Repair speed"] > 0 and 
                     (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
                     self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
                 self.repairSystemAction()
@@ -735,6 +826,7 @@ class Crew(object):
 
             # If room can be manned and it's not manned, man it. Unless it's ionized. Only man friendly systems.
             elif ( self.location.system.manned == False and self.location.system.ion_duration <= 0 and
+                   self.stats["Can man systems"] == True and 
                     (self.location.parentShip.isPlayer == True and self.stats["Allegiance"] == "friendly" or
                     self.location.parentShip.isPlayer == False and self.stats["Allegiance"] == "hostile") ):
                 self.location.system.manned = True
@@ -788,7 +880,7 @@ class Crew(object):
             
             if self.location.system.damage == self.location.system.systemLevel:
                 self.location.parentShip.hull -= 1
-                print(" [! %s of %s has been destroyed by boarders!" % (self.location.system.name, self.location.parentShip.name) )
+                print(" {-! %s of %s has been destroyed by boarders!" % (self.location.system.name, self.location.parentShip.name) )
 
         
     def repairSystemAction(self):
@@ -844,7 +936,7 @@ class Crew(object):
                         break
 
                 else:
-                    print(" {+ All fires onboard %s have been extinguished!" % (self.location.parentShip.name) )        
+                    print(" {+! All fires onboard %s have been extinguished!" % (self.location.parentShip.name) )        
 
     # Doing any action will force the crewmember to unman the system, if it is mannable to begin with.
     def unmanSystemAction(self):
@@ -858,11 +950,26 @@ class Crew(object):
         #print("DEBUGGING - %s has taken %d damage. Health now: %d" % (self.name, damage, self.stats["Health"]) )
         if self.stats["Health"] <= 0:
             if self.stats["Allegiance"] == "friendly":
-                print("!! [%s | %s] has died!" % (self.name, self.species) )
+                if self.isDrone == False:
+                    print("!! [%s | %s] has died!" % (self.name, self.species) )
+                elif self.isDrone == True:
+                    print("   [%s | %s] has been destroyed." % (self.name, self.species) )
 
             # If source of death was from crew combat, killer gains XP.
             if isinstance(source, Crew):
                 source.earnXP("Fighting")
+
+            if self.stats["Death explosion"] == True:
+                myAllegiance = self.stats["Allegiance"]
+                if myAllegiance == "friendly":
+                    theirAllegiance = "hostile"
+                elif myAllegiance == "hostile":
+                    theirAllegiance = "friendly"                
+                for enemyCrewmember in self.location.crewInRoom[theirAllegiance]:
+                    if enemyCrewmember.isDrone == False:
+                        enemyCrewmember.sufferDamage(15, "Zoltan energy burst")
+                    elif enemyCrewmember.isDrone == True:
+                        enemyCrewmember.sufferDamage(8, "Zoltan energy burst")
 
             for i, person in enumerate(self.shipOnboard.crew):
                 if person.name == self.name:
@@ -871,11 +978,18 @@ class Crew(object):
             for i, person in enumerate(self.location.crewInRoom[self.stats["Allegiance"]]):
                 if person.name == self.name:
                     del self.location.crewInRoom[self.stats["Allegiance"]][i]
+            if self.isDrone == True:
+                for i, drone in enumerate(self.shipOnboard.drones):
+                    if drone.name == self.name:
+                        del self.shipOnboard.drones[i]
 
             del self
 
 
     def earnXP(self, whatSkill):
+        if self.isDrone == True:    # Drones do not earn XP
+            return                  # ! Is return proper? Will it cause a bug? If so, just do if/else
+
         if self.experience_skills[whatSkill][0] < 2:    # Do not earn XP if max level already
             self.experience_skills[whatSkill][1] += 1
             if self.experience_skills[whatSkill][1] >= self.experience_skills[whatSkill][2]:
@@ -890,10 +1004,20 @@ class Crew(object):
                     self.stats["Fire fighting speed"] += 0.1
 
 
-# Types: Ship drone, Boarding drone, attack drone, defense drone
-# ! Make Boarding and Ship drones a subclass of Crew.
-class Drone(Crew):
+
+# Types: Combat drones, firedrones, defense drones, anti-combat drones, shield overcharger
+class ExternalDrone(object):
     def __init__(self):
         pass
 
+
+
+# ShipEntities - Entities that exist on ships, like crew and crew drones.
+#   - Stats | MovementProgress, Combat, ShipOnboard | generateCrew | spawnLocation | 
+#   - Evaluate Task | All Actions except Manning System | SufferDamage 
+# Crewmembers(ShipEntities) - All the species. 
+#   - Experience, earnXP,
+# PersonnelDrone(ShipEntities) - Boarding & Anti-personnel drones, Ion Intruder, Repair drone, AEGIS, Anonymous
+
+# ExternalDrone - ENTIRELY SEPERATE: 
     
